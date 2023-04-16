@@ -15,9 +15,9 @@ public final class MyCbClass implements CallBack {
     /////////////////////
 
     @Override
-    public CallResult handleInit(Object args) {
+    public CallResult init(Object args) {
         // ignore args for now
-        return new CallResult(Keyword.ok, new MyState(), null);
+        return new CallResult(Keyword.ok, null, new MyState());
     }
 
     @Override
@@ -28,7 +28,7 @@ public final class MyCbClass implements CallBack {
         
         System.out.println(String.format("new value: %d", uNew));
         
-        return new CallResult(Keyword.noreply, state, null, -1);
+        return new CallResult(Keyword.noreply, null, state, -1);
     }
 
     @Override
@@ -43,7 +43,5 @@ public final class MyCbClass implements CallBack {
 
     @Override
     public void handleTerminate(Object state) {
-        // TODO Auto-generated method stub
-
     }
 }

@@ -24,9 +24,9 @@ public final class MyCb2Class implements CallBack {
 	/////////////////////////////////////////
 
 	@Override
-	public CallResult handleInit(Object args) {
+	public CallResult init(Object args) {
 		System.out.println(String.format("in init"));
-		return new CallResult(Keyword.ok, new MyState(), null, 2000);
+		return new CallResult(Keyword.ok, null, new MyState(), 200);
 	}
 
 	@Override
@@ -45,11 +45,11 @@ public final class MyCb2Class implements CallBack {
 		
 		if (newCount == 3) {
 			
-			return new CallResult(Keyword.stop, newState, null);
+			return new CallResult(Keyword.stop, null, newState);
 			
 		}
 		else {
-			return new CallResult(Keyword.noreply, newState, null, 2000);
+			return new CallResult(Keyword.noreply, null, newState, 2000);
 		}
 				
 		

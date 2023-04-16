@@ -41,7 +41,7 @@ public class GenServer_test {
         GenServer.start(myCb, null, 0);
         
         try {
-			Thread.sleep(8000);
+			Thread.sleep(800);
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

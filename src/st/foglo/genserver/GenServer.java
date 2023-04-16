@@ -107,7 +107,7 @@ public final class GenServer implements Runnable {
     @Override
     public void run() {
     	
-    	CallResult cr = cb.handleInit(args);
+    	CallResult cr = cb.init(args);
     	synchronized (monitorTimeout) {
     		timeout = cr.timeoutMillis;
 		}
@@ -135,7 +135,7 @@ public final class GenServer implements Runnable {
             					GsMessage message = new GsMessage(Keyword.timeout, null);
             					CallResult crInfo = cb.handleInfo(message, state);
             					
-            					if (crInfo.word == Keyword.stop) {
+            					if (crInfo.code == Keyword.stop) {
             						cb.handleTerminate(crInfo.newState);
             						break;
             					}
@@ -173,7 +173,7 @@ public final class GenServer implements Runnable {
 						}
         			}
         			
-        			if (cr.word == Keyword.stop) {
+        			if (cr.code == Keyword.stop) {
         				cb.handleTerminate(state);
         			}
         		}

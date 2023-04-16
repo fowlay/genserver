@@ -27,13 +27,13 @@ public final class MyCb3Class implements CallBack {
 	/////////////////////
 
 	@Override
-	public CallResult handleInit(Object args) {
-		return new CallResult(Keyword.ok, new Object(), null);
+	public CallResult init(Object args) {
+		return new CallResult(Keyword.ok, null, new Object());
 	}
 
 	@Override
 	public CallResult handleCast(Object message, Object state) {
-		return new CallResult(Keyword.stop, state, null);
+		return new CallResult(Keyword.stop, null, state);
 	}
 
 	@Override
@@ -47,7 +47,7 @@ public final class MyCb3Class implements CallBack {
 		int x = ((TwoFactors)message).x;
 		int y = ((TwoFactors)message).y;
 		System.out.println("multiply");
-		return new CallResult(Keyword.reply, state, new Product(x*y));
+		return new CallResult(Keyword.reply, new Product(x*y), state);
 	}
 
 	@Override
