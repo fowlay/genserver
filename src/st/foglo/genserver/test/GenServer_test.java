@@ -32,4 +32,34 @@ public class GenServer_test {
         gs.cast(null);
         gs.cast(null);
     }
+    
+    @Test
+    public void timeout_test() {
+        
+        CallBack myCb = new MyCb2Class();
+        
+        GenServer.start(myCb, null, 0);
+        
+        try {
+			Thread.sleep(8000);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+    }
+    
+    @Test
+    public void call_test() {
+        
+        CallBack myCb = new MyCb3Class();
+        
+        GenServer gs = GenServer.start(myCb, null, 1);
+        
+        MyCb3Class.Product p = (MyCb3Class.Product)gs.call((new MyCb3Class()).new TwoFactors(8, 9));
+        
+        System.out.println(String.format("result: %d", p.product));
+        
+        gs.cast(null);
+
+    }
 }

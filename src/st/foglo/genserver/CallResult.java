@@ -6,13 +6,20 @@ public final class CallResult {
     
     final Object newState;
     
-    final int timeoutMillis;
+    final Object reply;
+    
+    final long timeoutMillis;
     
     //////////////////////////////////
 
-    public CallResult(Keyword word, Object newState, int timeoutMillis) {
+    public CallResult(Keyword word, Object newState, Object reply) {
+    	this(word, newState, reply, -1);
+    }
+    
+    public CallResult(Keyword word, Object newState, Object reply, int timeoutMillis) {
         this.word = word;
         this.newState = newState;
+        this.reply = reply;
         this.timeoutMillis = timeoutMillis;
     }
 }

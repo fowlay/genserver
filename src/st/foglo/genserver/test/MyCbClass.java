@@ -5,40 +5,44 @@ import st.foglo.genserver.CallResult;
 import st.foglo.genserver.Keyword;
 
 public final class MyCbClass implements CallBack {
+	
+	public final class MyState {
+		// could be int as well
+	    public Integer count = 0;
+	}
+
     
     /////////////////////
 
     @Override
-    public Object init(Object args) {
+    public CallResult handleInit(Object args) {
         // ignore args for now
-        return new MyState();
+        return new CallResult(Keyword.ok, new MyState(), null);
     }
 
     @Override
-    public CallResult cast(Object message, Object state) {
+    public CallResult handleCast(Object message, Object state) {
         Integer u = ((MyState)state).count;
         int uNew = u.intValue() + 1;
         ((MyState)state).count = Integer.valueOf(uNew);
         
         System.out.println(String.format("new value: %d", uNew));
         
-        return new CallResult(Keyword.noreply, state, -1);
+        return new CallResult(Keyword.noreply, state, null, -1);
     }
 
     @Override
-    public void info(Object state) {
-        // TODO Auto-generated method stub
-
+    public CallResult handleInfo(Object message, Object state) {
+    	return null;
     }
 
     @Override
-    public CallResult call(Object state) {
-        // TODO Auto-generated method stub
+    public CallResult handleCall(Object message, Object state) {
         return null;
     }
 
     @Override
-    public void terminate(Object state) {
+    public void handleTerminate(Object state) {
         // TODO Auto-generated method stub
 
     }
