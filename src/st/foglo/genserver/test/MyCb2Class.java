@@ -2,7 +2,7 @@ package st.foglo.genserver.test;
 
 import st.foglo.genserver.CallBack;
 import st.foglo.genserver.CallResult;
-import st.foglo.genserver.Keyword;
+import st.foglo.genserver.Atom;
 
 public final class MyCb2Class implements CallBack {
 	
@@ -26,7 +26,7 @@ public final class MyCb2Class implements CallBack {
 	@Override
 	public CallResult init(Object args) {
 		System.out.println(String.format("in init"));
-		return new CallResult(Keyword.ok, null, new MyState(), 200);
+		return new CallResult(Atom.OK, null, new MyState(), 200);
 	}
 
 	@Override
@@ -45,11 +45,11 @@ public final class MyCb2Class implements CallBack {
 		
 		if (newCount == 3) {
 			
-			return new CallResult(Keyword.stop, null, newState);
+			return new CallResult(Atom.STOP, null, newState);
 			
 		}
 		else {
-			return new CallResult(Keyword.noreply, null, newState, 2000);
+			return new CallResult(Atom.NOREPLY, null, newState, 2000);
 		}
 				
 		

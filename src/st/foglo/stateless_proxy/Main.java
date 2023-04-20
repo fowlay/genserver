@@ -20,32 +20,45 @@ public final class Main {
 
 
 		// 2a. create the ue port listener
-		
-		CallBack uePlCb = new PlCb();
-		
-		GenServer uePl = GenServer.start(uePlCb, new Object[]{Atom.ue, px});
+
+		GenServer uePl = GenServer.start(
+				new PlCb(),
+		        new Object[] {
+		        		Side.UE,
+		        		px,
+		        		new byte[] {10, 0, 0, 17},
+		        		Integer.valueOf(5060),
+		        		new byte[] {10, 0, 0, 14},
+		        		Integer.valueOf(5060)});
 		
 		
 		// 2b. create the ue port sender
 		
 		CallBack uePsCb = new PsCb();
 		
-		GenServer uePs = GenServer.start(uePsCb, new Object[]{Atom.ue});
+		GenServer uePs = GenServer.start(uePsCb, new Object[]{Side.UE, uePl});
 		
 
 
 		// 3a. create the sp port listener
 		
-		CallBack spPlCb = new PlCb();
-		
-		GenServer spPl = GenServer.start(spPlCb, new Object[]{Atom.sp, px});
+		GenServer spPl =
+				GenServer.start(
+						new PlCb(),
+						new Object[]{
+								Side.SP,
+								px,
+								new byte[]{10,0,0,17},
+								Integer.valueOf(5070),
+								new byte[]{toByte(193),105,toByte(226),106},
+								Integer.valueOf(5060)});
 		
 		
 		// 3b. create the ue port sender
 		
 		CallBack spPsCb = new PsCb();
 		
-		GenServer spPs = GenServer.start(spPsCb, new Object[]{Atom.sp});
+		GenServer spPs = GenServer.start(spPsCb, new Object[]{Side.SP, spPl});
 		
 		
 
@@ -62,8 +75,14 @@ public final class Main {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		
-		
 	}
-
+	
+	private static byte toByte(int k) {
+		if (k >= 128) {
+			return (byte) (k-256);
+		}
+		else {
+			return (byte) k;
+		}
+	}
 }

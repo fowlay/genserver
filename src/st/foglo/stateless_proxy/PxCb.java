@@ -6,7 +6,7 @@ import java.util.Map;
 import st.foglo.genserver.CallBack;
 import st.foglo.genserver.CallResult;
 import st.foglo.genserver.GenServer;
-import st.foglo.genserver.Keyword;
+import st.foglo.genserver.Atom;
 
 /**
  * The stateless proxy.
@@ -14,8 +14,8 @@ import st.foglo.genserver.Keyword;
 public final class PxCb implements CallBack {
 	
 	
-	public class ProxyState {
-		final Map<Atom, GenServer> portSenders = new HashMap<Atom, GenServer>();
+	public class State {
+		final Map<Side, GenServer> portSenders = new HashMap<Side, GenServer>();
 		
 		// no constructor yet .. to be added
 	}
@@ -24,25 +24,54 @@ public final class PxCb implements CallBack {
 
 	@Override
 	public CallResult init(Object args) {
-		return new CallResult(Keyword.ok, new ProxyState());
+		return new CallResult(Atom.OK, new State());
 	}
 
 	@Override
 	public CallResult handleCast(Object message, Object state) {
 		MsgBase mb = (MsgBase)message;
-		if (mb.atom == Atom.portSenders) {
+		if (mb instanceof PortSendersMsg) {
 			
 			PortSendersMsg plm = (PortSendersMsg)mb;
 			
-			ProxyState pxState = (ProxyState)state;
-			pxState.portSenders.put(Atom.ue, plm.uePortSender);
-			pxState.portSenders.put(Atom.sp, plm.spPortSender);
+			State pxState = (State)state;
+			pxState.portSenders.put(Side.UE, plm.uePortSender);
+			pxState.portSenders.put(Side.SP, plm.spPortSender);
 			
-			return new CallResult(Keyword.noreply, state);
+			return new CallResult(Atom.NOREPLY, state);
+		}
+		else if (mb instanceof InternalSipMessage) {
+			
+			InternalSipMessage ism = (InternalSipMessage)message;
+			SipMessage sm = ism.message;
+			
+			Side side = ism.side;
+			Side otherSide = otherSide(side);
+			
+			System.out.println("proxy received:");
+			System.out.println(String.format("from: %s", ism.side));
+			System.out.println(sm.toString());
+			
+			GenServer gsForward = ((State)state).portSenders.get(otherSide);
+			
+			
+			// do some message processing according to RFC 3261
+			
+			gsForward.cast(ism);
+			
+			
+			
+			
+
+			return new CallResult(Atom.NOREPLY, state);
 		}
 		else {
 			return null;
 		}
+	}
+
+	private Side otherSide(Side side) {
+		return side == Side.UE ? Side.SP : Side.UE;
 	}
 
 	@Override

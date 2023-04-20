@@ -27,10 +27,10 @@ public final class GenServer implements Runnable {
 
     private class GsMessage {
         
-        final Keyword keyword;
+        final Atom keyword;
         final Object object;
         
-        GsMessage(Keyword keyword, Object object) {
+        GsMessage(Atom keyword, Object object) {
             this.keyword = keyword;
             this.object = object;
         }
@@ -78,13 +78,13 @@ public final class GenServer implements Runnable {
     }
 
 	public void cast(Object object) {
-    	insertMessage(new GsMessage(Keyword.cast, object));
+    	insertMessage(new GsMessage(Atom.CAST, object));
     }
     
     
     public Object call(Object object) {
 
-    	insertMessage(new GsMessage(Keyword.call, object));
+    	insertMessage(new GsMessage(Atom.CALL, object));
 
     	for (; true; ) {
 
@@ -125,22 +125,23 @@ public final class GenServer implements Runnable {
         			try {
         				if (timeout >= 0) {
         					//trace("wait limited: %d", timeout);
-        					monitorTimeout.wait(timeout);
+        					if (timeout > 0) {
+        						monitorTimeout.wait(timeout);
+        					}
         					if (timeout == -1) {
         						trace("notified during limited wait");
         						continue;
         					}
         					else {
             					// trace("continue after timeout");
-            					GsMessage message = new GsMessage(Keyword.timeout, null);
+            					GsMessage message = new GsMessage(Atom.TIMEOUT, null);
             					CallResult crInfo = cb.handleInfo(message, state);
             					
-            					if (crInfo.code == Keyword.stop) {
+            					if (crInfo.code == Atom.STOP) {
             						cb.handleTerminate(crInfo.newState);
             						break;
             					}
             					else {
-
             						state = crInfo.newState;
             						timeout = crInfo.timeoutMillis;
             					}
@@ -163,7 +164,7 @@ public final class GenServer implements Runnable {
         			m = messageQueue.remove();
         		}
         		
-        		if (m.keyword == Keyword.cast) {
+        		if (m.keyword == Atom.CAST) {
         			cr = cb.handleCast(m.object, state);
         			state = cr.newState;
         			
@@ -173,11 +174,11 @@ public final class GenServer implements Runnable {
 						}
         			}
         			
-        			if (cr.code == Keyword.stop) {
+        			if (cr.code == Atom.STOP) {
         				cb.handleTerminate(state);
         			}
         		}
-        		else if (m.keyword == Keyword.call) {
+        		else if (m.keyword == Atom.CALL) {
         			// trace("perform a call");
         			cr = cb.handleCall(m.object, state);
         			// trace("callback executed");

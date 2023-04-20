@@ -2,7 +2,7 @@ package st.foglo.genserver.test;
 
 import st.foglo.genserver.CallBack;
 import st.foglo.genserver.CallResult;
-import st.foglo.genserver.Keyword;
+import st.foglo.genserver.Atom;
 
 public final class MyCb3Class implements CallBack {
 	
@@ -28,12 +28,12 @@ public final class MyCb3Class implements CallBack {
 
 	@Override
 	public CallResult init(Object args) {
-		return new CallResult(Keyword.ok, null, new Object());
+		return new CallResult(Atom.OK, null, new Object());
 	}
 
 	@Override
 	public CallResult handleCast(Object message, Object state) {
-		return new CallResult(Keyword.stop, null, state);
+		return new CallResult(Atom.STOP, null, state);
 	}
 
 	@Override
@@ -47,7 +47,7 @@ public final class MyCb3Class implements CallBack {
 		int x = ((TwoFactors)message).x;
 		int y = ((TwoFactors)message).y;
 		System.out.println("multiply");
-		return new CallResult(Keyword.reply, new Product(x*y), state);
+		return new CallResult(Atom.REPLY, new Product(x*y), state);
 	}
 
 	@Override
