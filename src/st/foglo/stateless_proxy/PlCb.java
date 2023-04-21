@@ -18,33 +18,23 @@ import st.foglo.genserver.Atom;
  */
 public class PlCb implements CallBack {
 	
-	public class PortListenerState {
+	public class State {
 		final Side side;
 		final GenServer proxy;
 		
 		int listenerPort;
 		DatagramSocket socket;
-		
-		byte[] peerAddr;
-		Integer peerPort;
-		
 
-		
-		public PortListenerState(
+		public State(
 				Side side,
 				GenServer aa,
 				int listenerPort,
-				DatagramSocket socket,
-				byte[] peerAddr,
-				Integer peerPort) {
+				DatagramSocket socket) {
 			super();
 			this.side = side;
 			this.proxy = aa;
 			this.listenerPort = listenerPort;
 			this.socket = socket;
-			
-			this.peerAddr = peerAddr;
-			this.peerPort = peerPort;
 		}
 	}
 	
@@ -77,21 +67,17 @@ public class PlCb implements CallBack {
 			e.printStackTrace();
 		}
 		
-		byte[] peerAddr = (byte[])aa[4];
-		Integer peerPort = (Integer)aa[5];
 		
 		System.out.println("listener init returns"); // seen
 		
 		return new CallResult(
 				Atom.OK,
 				null,
-				new PortListenerState(
+				new State(
 						(Side)aa[0],
 						(GenServer)aa[1],
 						port,
-						socket,
-						peerAddr,
-						peerPort),
+						socket),
 				
 				0);
 	}
@@ -99,27 +85,17 @@ public class PlCb implements CallBack {
 	@Override
 	public CallResult handleCast(Object message, Object state) {
 
-		DatagramSocket socket = ((PortListenerState) state).socket;
-
 		MsgBase mb = (MsgBase) message;
 		if (mb instanceof BufferMsg) {
-			BufferMsg bm = (BufferMsg) mb;
-			DatagramPacket p = new DatagramPacket(bm.buffer, 0);
-			try {
-				final byte[] remoteAddrB = bm.destAddr == null ? ((PortListenerState) state).peerAddr : bm.destAddr;
-				final InetAddress destAddr = InetAddress.getByAddress(remoteAddrB);
-
-				final int destPort = bm.destAddr == null ? ((PortListenerState) state).peerPort.intValue()
-				        : bm.destPort.intValue();
-
-				socket.connect(destAddr, destPort);
-				socket.send(p);
-				socket.disconnect();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+			System.out.println("cannot happen"); // TODO, this is dead code
+			
 		} else {
-			throw new RuntimeException("cannot handle cast");
+			try {
+				throw new RuntimeException("cannot handle cast");
+			} catch (Exception e) {
+				e.printStackTrace();
+				System.exit(1);;
+			}
 		}
 
 		return new CallResult(Atom.NOREPLY, state);
@@ -136,10 +112,10 @@ public class PlCb implements CallBack {
 		
 		// read from the socket, with a timeout
 		
-		final PortListenerState plState = (PortListenerState)state;
+		final State plState = (State)state;
 		System.out.println(String.format("timed out: %s, port: %d", plState.side, plState.listenerPort));
 		
-		DatagramSocket socket = ((PortListenerState)state).socket;
+		DatagramSocket socket = ((State)state).socket;
 		
 		byte[] buffer = new byte[2500];                        // TODO hardcoded length
 		DatagramPacket p = new DatagramPacket(buffer, buffer.length);
@@ -154,19 +130,28 @@ public class PlCb implements CallBack {
 			}
 			System.out.println("received: "+sb.toString());
 			
-			
-			SipMessage m =
-					new SipMessage(buffer);
-			
-			InternalSipMessage iMsg =
-					new InternalSipMessage(
-							plState.side,
-							m);
-			
-			
-			((PortListenerState)state).proxy.cast(iMsg);
-			
-			
+			if (recLength <= 4) {   // TODO, hard code
+				// assume a keep-alive message
+				
+				final KeepAliveMessage kam = new KeepAliveMessage(plState.side, buffer);
+				
+				((State)state).proxy.cast(kam);
+				
+			}
+			else {
+				SipMessage m =
+						new SipMessage(buffer);
+				
+				InternalSipMessage iMsg =
+						new InternalSipMessage(
+								plState.side,
+								m,
+								null,
+								null);
+				
+				((State)state).proxy.cast(iMsg);
+			}
+
 			return new CallResult(Atom.NOREPLY, null, state, 0);
 			
 		} catch (SocketTimeoutException e) {

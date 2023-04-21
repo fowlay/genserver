@@ -1,11 +1,17 @@
 package st.foglo.stateless_proxy;
 
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.net.SocketException;
 import java.util.List;
 import java.util.Map;
 
 import st.foglo.genserver.CallBack;
 import st.foglo.genserver.CallResult;
-import st.foglo.genserver.GenServer;
 import st.foglo.genserver.Atom;
 
 /**
@@ -17,19 +23,25 @@ import st.foglo.genserver.Atom;
 public final class PsCb implements CallBack {
 
 	public class State {
-		Side side = null;
-		Object peerAddr = null;
-		Object peerPort = null;
+		final Side side;
 		
-		final GenServer pl;
+		/** outbound proxy address */
+		final byte[] peerAddr;
 		
-		public State(Side side, Object peerAddr, Object peerPort, GenServer pl) {
+		/** outbound proxy port */
+		final Integer peerPort;
+		
+		final DatagramSocket socket;
+
+		public State(Side side, byte[] peerAddr, Integer peerPort, DatagramSocket socket) {
 			super();
 			this.side = side;
 			this.peerAddr = peerAddr;
 			this.peerPort = peerPort;
-			this.pl = pl;
+			this.socket = socket;
 		}
+		
+
 	}
 	
 	
@@ -38,29 +50,81 @@ public final class PsCb implements CallBack {
 	
 	@Override
 	public CallResult init(Object args) {
+		final Object[] aa = (Object[]) args;
+		final int timeout = 2000;
 		
-		Object[] aa = (Object[]) args;
+		DatagramSocket s = null;
+		try {
+			s = new DatagramSocket();
+		} catch (SocketException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			System.exit(1);
+		}
 
-		return new CallResult(Atom.OK, null, new State((Side)aa[0], null, null, (GenServer)aa[1]), 2000);
+		return new CallResult(Atom.OK,
+				null,
+				new State((Side)aa[0], (byte[])aa[1], (Integer)aa[2], s),
+				timeout);
 	}
+	
 
 	@Override
 	public CallResult handleCast(Object message, Object state) {
 		// send a datagram
 		MsgBase mb = (MsgBase) message;
-		if (mb instanceof InternalSipMessage) {
+		if (mb instanceof KeepAliveMessage) {
+			final KeepAliveMessage kam = (KeepAliveMessage) mb;
 			
-			InternalSipMessage ism = (InternalSipMessage) mb;
+			// always use outbound proxy
+		
+			final DatagramSocket s = ((State)state).socket;
 			
-			GenServer pl = ((State)state).pl;
+			final byte[] bytes = ((State)state).peerAddr;
+			final int port = ((State)state).peerPort.intValue();
+
+			try {
+				final InetAddress ia = InetAddress.getByAddress(bytes);
+				final SocketAddress sa = new InetSocketAddress(ia, port);
+				s.connect(sa);
+				final DatagramPacket p = new DatagramPacket(kam.buffer, kam.buffer.length);
+				s.send(p);
+				s.disconnect();
+
+			} catch (IOException e) {
+				e.printStackTrace();
+				System.exit(1);
+			}
+		}
+		else if (mb instanceof InternalSipMessage) {
+			final InternalSipMessage ism = (InternalSipMessage) mb;
 			
-			byte[] ba = toByteArray(ism.message);
+			// if the message comes with destination info, then use it,
+			// else use outbound proxy
+		
+			final byte[] ba = toByteArray(ism.message);
 			
-			BufferMsg bm = new BufferMsg(ba, null, null);
+			final DatagramSocket s = ((State)state).socket;
 			
-			pl.cast(bm);
-			
-			return new CallResult(Atom.NOREPLY, state);
+			final byte[] bytes = ism.destAddr == null ? ((State)state).peerAddr : ism.destAddr;
+			final int port = ism.destAddr == null ? ((State)state).peerPort.intValue() : ism.destPort.intValue();
+
+			try {
+				final InetAddress ia = InetAddress.getByAddress(bytes);
+				final SocketAddress sa = new InetSocketAddress(ia, port);
+				s.connect(sa);
+				
+				final DatagramPacket p = new DatagramPacket(ba, ba.length);
+				
+				s.send(p);
+				
+				s.disconnect();
+
+			} catch (IOException e) {
+				e.printStackTrace();
+				System.exit(1);
+			}
+
 		}
 		
 		
@@ -73,6 +137,25 @@ public final class PsCb implements CallBack {
 	
 	
 	
+
+	@Override
+	public CallResult handleCall(Object message, Object state) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public CallResult handleInfo(Object message, Object state) {
+		System.out.println(String.format("portsender timeout: %s", ((State)state).side));
+		return new CallResult(Atom.NOREPLY, state);
+	}
+
+	@Override
+	public void handleTerminate(Object state) {
+		// TODO Auto-generated method stub
+
+	}
+
 
 	private byte[] toByteArray(SipMessage message) {
 		
@@ -99,7 +182,7 @@ public final class PsCb implements CallBack {
 				ba[k++] = 10;
 			}
 		}
-
+	
 		if (message.body != null) {
 			ba[k++] = 13;
 			ba[k++] = 10;
@@ -116,24 +199,6 @@ public final class PsCb implements CallBack {
 		}
 		
 		return result;
-	}
-
-	@Override
-	public CallResult handleCall(Object message, Object state) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public CallResult handleInfo(Object message, Object state) {
-		System.out.println(String.format("portsender timeout: %s", ((State)state).side));
-		return new CallResult(Atom.NOREPLY, state);
-	}
-
-	@Override
-	public void handleTerminate(Object state) {
-		// TODO Auto-generated method stub
-
 	}
 
 }
