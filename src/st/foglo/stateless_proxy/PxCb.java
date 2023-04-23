@@ -4,16 +4,24 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
 
 import st.foglo.genserver.CallBack;
 import st.foglo.genserver.CallResult;
 import st.foglo.genserver.GenServer;
+import st.foglo.stateless_proxy.Util.Level;
 import st.foglo.genserver.Atom;
 
 /**
  * The stateless proxy.
  */
 public final class PxCb implements CallBack {
+	
+	private Set<Integer> seen = new HashSet<Integer>();
+	
+
+	private int castCount = 0;
 	
 	
 	public class State {
@@ -25,145 +33,153 @@ public final class PxCb implements CallBack {
 	///////////////////////////////////////////
 
 	@Override
-	public CallResult init(Object args) {
-		return new CallResult(Atom.OK, new State());
+	public CallResult init(Object[] args) {
+		State state = new State();
+		state.listenerAddresses.put(Side.UE, (byte[])args[0]);
+		state.listenerPorts.put(Side.UE, (Integer)args[1]);
+		state.listenerAddresses.put(Side.SP, (byte[])args[2]);
+		state.listenerPorts.put(Side.SP, (Integer)args[3]);
+		return new CallResult(Atom.OK, state);
 	}
 
 	@Override
 	public CallResult handleCast(Object message, Object state) {
+		
+		castCount++;
+		
+		final State pxState = (State)state;
+		
 		MsgBase mb = (MsgBase)message;
 		if (mb instanceof PortSendersMsg) {
 			
 			PortSendersMsg plm = (PortSendersMsg)mb;
 			
-			State pxState = (State)state;
 			pxState.portSenders.put(Side.UE, plm.uePortSender);
 			pxState.portSenders.put(Side.SP, plm.spPortSender);
-			
-			pxState.listenerAddresses.put(Side.UE, plm.ueListenerAddress);
-			pxState.listenerPorts.put(Side.UE, plm.ueListenerPort);
-			
-			pxState.listenerAddresses.put(Side.SP, plm.spListenerAddress);
-			pxState.listenerPorts.put(Side.SP, plm.spListenerPort);
-			
-			
+
 			return new CallResult(Atom.NOREPLY, state);
 		}
 		else if (mb instanceof KeepAliveMessage) {
 			final KeepAliveMessage kam = (KeepAliveMessage)message;
-			
 			final Side side = kam.side;
 			final Side otherSide = otherSide(side);
-			
-			System.out.println("proxy received k-a-message");
-			
-			GenServer gsForward = ((State)state).portSenders.get(otherSide);
-			
+			Util.trace(Level.verbose, "PX received k-a-message, %s -> %s", side.toString(), otherSide.toString());
+			GenServer gsForward = pxState.portSenders.get(otherSide);
 			gsForward.cast(kam);
-
 			return new CallResult(Atom.NOREPLY, state);
-			
 		}
 		else if (mb instanceof InternalSipMessage) {
 			
-			try {
-				InternalSipMessage ism = (InternalSipMessage)message;
-				final SipMessage sm = ism.message;
+			InternalSipMessage ism = (InternalSipMessage)message;
 			
-				Side side = ism.side;
-				Side otherSide = otherSide(side);
-			
-				System.out.println("proxy received:");
-				System.out.println(String.format("from: %s", ism.side));
-				System.out.println(sm.toString());
-			
-				GenServer gsForward = ((State)state).portSenders.get(otherSide);
-
-				if (isRequest(sm)) {
-					
-					// modify before passing on
-					
-					String mf = sm.headers.get("Max-Forwards").get(0);
-					int mfValue = Integer.parseInt(mf.substring(mf.indexOf(':')));
-					sm.headers.put("Max-Forwards", listOne(String.format("Max-Forwards: %d", mfValue-1)));
-					
-				
-					List<String> vv = sm.headers.get("Via");
-					
-					String topVia = vv.get(0);
-
-					String topViaBranch = "NOMATCH";
-					for (String u : topVia.split(";")) {
-						if (u.startsWith("branch=")) {}
-						topViaBranch = u.substring(u.indexOf('=')+1);
-					}
-					
-					final byte[] listenerAddress = ((State)state).listenerAddresses.get(otherSide(ism.side));
-					final Integer listenerPort = ((State)state).listenerPorts.get(otherSide(ism.side));
-					
-					String newVia =
-							String.format("Via: SIP/2.0/UDP %s:%s;rport;branch=%s",
-									toDottedAddress(listenerAddress),
-									listenerPort.intValue(),
-									topViaBranch + "_h8k4c9ne"
-							);
-
-					prepend(newVia, vv);
-					
-					((State)state).portSenders.get(otherSide(ism.side)).cast(ism);
-
-				}
-				else if (isResponse(sm)) {
-					// a response .. easy, just drop topmost via and use new top via as destination
-					
-					List<String> vias = sm.headers.get("Via");
-					List<String> newVias = dropFirst(vias);
-					
-					sm.headers.put("Via", newVias);
-					
-					String topVia = newVias.get(0);
-					
-					String leadingPart = topVia.split(";")[0];
-					
-					String[] subParts = leadingPart.split(" ");
-					
-					String addrPort = subParts[subParts.length - 1];
-					
-					String[] addrPortParts = addrPort.split(":");
-					
-					String destAddr = addrPortParts[0];
-					String destPort = addrPortParts.length > 1 ? addrPortParts[1] : "5060";
-					
-					
-					InternalSipMessage newIsm = new InternalSipMessage(
-							ism.side,
-							ism.message,
-							toByteArray(destAddr),
-							Integer.valueOf(Integer.parseInt(destPort)));
-					
-					
-					((State)state).portSenders.get(otherSide(ism.side)).cast(newIsm);
-					
-					
-					
-					
-					
-				}
-				else {
-					throw new RuntimeException("neither request nor response");
-				}
-			
-				gsForward.cast(ism);
-
-
-				
+			if (seen.contains(ism.digest)) {
+				// ignore this resend
+				Util.trace(Level.verbose, "PX ------------- ignore resend from %s: %d", ism.side.toString(), ism.digest.intValue());
+				return new CallResult(Atom.NOREPLY, state);
 			}
-			catch (Exception e) {
-				e.printStackTrace();
-				System.exit(1);
+			else {
+				
+				seen.add(ism.digest);
+			
+				try {
+				
+					final SipMessage sm = ism.message;
+				
+					final Side side = ism.side;
+					final Side otherSide = otherSide(side);
+			
+					Util.trace(
+							Level.verbose,
+							"PX received from %s [%d]:%n%s",
+							ism.side.toString(),
+							ism.digest.intValue(),
+							sm.toString());
+
+					
+
+					if (isRequest(sm)) {
+					
+						// modify before passing on
+					
+						Util.trace(Level.debug, "PX forwarding a request");
+
+						String mf = sm.headers.get("Max-Forwards").get(0);
+						int mfValue = Integer.parseInt(mf.substring(mf.indexOf(':')+1).trim());
+						sm.headers.put("Max-Forwards", listOne(String.format("Max-Forwards: %d", mfValue-1)));
+					
+						List<String> vv = sm.headers.get("Via");
+
+						String topVia = vv.get(0);
+
+						String topViaBranch = "NOMATCH";
+						for (String u : topVia.split(";")) {
+							if (u.startsWith("branch=")) {
+								topViaBranch = u.substring(u.indexOf('=')+1);
+							}
+						}
+
+						final byte[] listenerAddress = ((State)state).listenerAddresses.get(otherSide);
+
+						final Integer localPort =
+								(Integer) ((State)state).portSenders.get(otherSide(ism.side)).call(new GetLocalPortMsg());
+
+						String newVia =
+								String.format("Via: SIP/2.0/UDP %s:%s;rport;branch=%s",
+										toDottedAddress(listenerAddress),
+										localPort.intValue(),
+										topViaBranch + "_h8k4c9ne"
+										);
+
+						prepend(newVia, vv);
+
+						Util.trace(Level.verbose, "proxy casting, count: %d", castCount);
+						final GenServer gsForward = ((State)state).portSenders.get(otherSide);
+						gsForward.cast(ism);
+					}
+					else if (isResponse(sm)) {
+						// a response .. easy, just drop topmost via and use new top via as destination
+
+						List<String> vias = sm.headers.get("Via");
+						List<String> newVias = dropFirst(vias);
+
+						sm.headers.put("Via", newVias);
+
+						String topVia = newVias.get(0);
+
+						String leadingPart = topVia.split(";")[0];
+
+						String[] subParts = leadingPart.split(" ");
+
+						String addrPort = subParts[subParts.length - 1];
+
+						String[] addrPortParts = addrPort.split(":");
+
+						String destAddr = addrPortParts[0];
+						String destPort = addrPortParts.length > 1 ? addrPortParts[1] : "5060";
+
+						final GenServer transientSender =
+								GenServer.start(
+										new RespSenderCb(),
+										new Object[]{otherSide(ism.side)});
+
+						InternalSipMessage newIsm = new InternalSipMessage(
+								ism.side,
+								ism.message,
+								Integer.valueOf(0),
+								toByteArray(destAddr),
+								Integer.valueOf(Integer.parseInt(destPort)));
+						transientSender.cast(newIsm);
+					}
+					else {
+						throw new RuntimeException("neither request nor response");
+					}
+				}
+				catch (Exception e) {
+					e.printStackTrace();
+					System.exit(1);
+				}
 			}
 			return new CallResult(Atom.NOREPLY, state);
-			
 		}
 		else {
 			// make some noise

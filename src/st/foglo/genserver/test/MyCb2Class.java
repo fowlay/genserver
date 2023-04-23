@@ -24,7 +24,7 @@ public final class MyCb2Class implements CallBack {
 	/////////////////////////////////////////
 
 	@Override
-	public CallResult init(Object args) {
+	public CallResult init(Object[] args) {
 		System.out.println(String.format("in init"));
 		return new CallResult(Atom.OK, null, new MyState(), 200);
 	}

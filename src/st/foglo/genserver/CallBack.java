@@ -10,7 +10,7 @@ public interface CallBack {
 	 * CallResult.newState = initial Object
 	 * CallResult.timeoutMillis = -1 | 0..
 	 */
-    public CallResult init(Object args);
+    public CallResult init(Object[] args);
     
     /**
      * This method casts a message to the GenServer.

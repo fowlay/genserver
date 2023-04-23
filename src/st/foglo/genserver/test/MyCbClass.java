@@ -15,7 +15,7 @@ public final class MyCbClass implements CallBack {
     /////////////////////
 
     @Override
-    public CallResult init(Object args) {
+    public CallResult init(Object[] args) {
         // ignore args for now
         return new CallResult(Atom.OK, null, new MyState());
     }

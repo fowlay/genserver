@@ -39,13 +39,13 @@ public class SipMessage {
 	, scanBody}
 	
 	
-	public SipMessage(byte[] buffer) {
+	public SipMessage(byte[] buffer, int size) {
 		
 		String firstLine = null;
 		STATE state = STATE.scanFirstLine;
 		StringBuilder sb = new StringBuilder();
 		byte b;
-		for (int k = 0; k < buffer.length; k++) {
+		for (int k = 0; k < size; k++) {
 			b = buffer[k];
 			
 			if (state == STATE.scanFirstLine || state == STATE.scanFirstLineCrSeen) {

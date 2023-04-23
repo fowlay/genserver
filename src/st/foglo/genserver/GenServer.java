@@ -1,15 +1,20 @@
 package st.foglo.genserver;
 
+import java.util.LinkedList;
 import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
+//import java.util.concurrent.ConcurrentLinkedQueue;
+
+import st.foglo.stateless_proxy.Util;
+import st.foglo.stateless_proxy.Util.Level;
 
 public final class GenServer implements Runnable {
 
-    private final Object args;
+    private final Object[] args;
     private final CallBack cb;
 
     private Object monitorMessageQueue = new Object();
-    private final Queue<GsMessage> messageQueue = new ConcurrentLinkedQueue<GsMessage>();
+    // private final Queue<GsMessage> messageQueue = new ConcurrentLinkedQueue<GsMessage>();
+    private final Queue<GsMessage> messageQueue = new LinkedList<GsMessage>();
 
     private Object monitorTimeout = new Object();
     private volatile long timeout = -1;
@@ -38,11 +43,11 @@ public final class GenServer implements Runnable {
 
     //////////////////////////////////////////////////////////
 
-    public GenServer(CallBack cb, Object args) {
+    public GenServer(CallBack cb, Object[] args) {
         this(cb, args, 0);
     }
     
-    public GenServer(CallBack cb, Object args, int msgLevel) {
+    public GenServer(CallBack cb, Object[] args, int msgLevel) {
         this.cb = cb;
         this.args = args;
         this.msgLevel = msgLevel;
@@ -51,11 +56,11 @@ public final class GenServer implements Runnable {
     /**
      * Start an unregistered GenServer process.
      */
-    public static GenServer start(CallBack cb, Object args) {
+    public static GenServer start(CallBack cb, Object[] args) {
     	return start(cb, args, 0);
     }
     
-    public static GenServer start(CallBack cb, Object args, int trace) {
+    public static GenServer start(CallBack cb, Object[] args, int trace) {
     	final GenServer gs = new GenServer(cb, args, trace);
     	final Thread thread = new Thread(gs);
     	thread.start();
@@ -119,7 +124,14 @@ public final class GenServer implements Runnable {
         
         for (; true; ) {
 
-        	if (messageQueue.isEmpty()) {
+        	final boolean isEmptyMessageQueue;
+        	synchronized (monitorMessageQueue) {
+        		synchronized (messageQueue) {
+        			isEmptyMessageQueue = messageQueue.isEmpty();
+        		}
+			}
+        	
+        	if (isEmptyMessageQueue) {
 
         		synchronized (monitorTimeout) {
         			try {
@@ -128,11 +140,11 @@ public final class GenServer implements Runnable {
         					if (timeout > 0) {
         						monitorTimeout.wait(timeout);
         					}
-        					if (timeout == -1) {
-        						trace("notified during limited wait");
-        						continue;
-        					}
-        					else {
+//        					if (timeout == -1) {
+//        						trace("notified during limited wait");
+//        						continue;
+//        					}
+//        					else {
             					// trace("continue after timeout");
             					GsMessage message = new GsMessage(Atom.TIMEOUT, null);
             					CallResult crInfo = cb.handleInfo(message, state);
@@ -145,7 +157,7 @@ public final class GenServer implements Runnable {
             						state = crInfo.newState;
             						timeout = crInfo.timeoutMillis;
             					}
-        					}
+//        					}
         				}
         				else {
         					monitorTimeout.wait();
@@ -161,7 +173,12 @@ public final class GenServer implements Runnable {
         	else {
         		final GsMessage m;
         		synchronized(monitorMessageQueue) {
-        			m = messageQueue.remove();
+        			synchronized (messageQueue) {
+        				Util.trace(Level.verbose, "about to remove, thread: %s, queue size: %d", Thread.currentThread().toString(), messageQueue.size());
+        				m = messageQueue.remove();
+        				Util.trace(Level.verbose, "    done remove, thread: %s, queue size: %d", Thread.currentThread().toString(), messageQueue.size());
+        				Util.trace(Level.verbose, "    done remove, thread: %s, queue stat: %s", Thread.currentThread().toString(), messageQueue.isEmpty() ? "empty" : "non-empty");
+        			}
         		}
         		
         		if (m.keyword == Atom.CAST) {
@@ -207,8 +224,12 @@ public final class GenServer implements Runnable {
     private void insertMessage(GsMessage message) {
     	final boolean wasEmpty;
     	synchronized(monitorMessageQueue) {
-    		wasEmpty = messageQueue.isEmpty();
-    		messageQueue.add(message);
+    		synchronized (messageQueue) {
+        		wasEmpty = messageQueue.isEmpty();
+        		Util.trace(Level.verbose, "before insert, thread: %s, size: %d", Thread.currentThread().toString(), messageQueue.size());
+        		messageQueue.add(message);
+        		Util.trace(Level.verbose, " after insert, thread: %s, size: %d", Thread.currentThread().toString(), messageQueue.size());
+			}
     	}
     	
 		if (wasEmpty) {
