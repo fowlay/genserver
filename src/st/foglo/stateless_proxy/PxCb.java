@@ -19,43 +19,40 @@ import st.foglo.genserver.Atom;
 public final class PxCb implements CallBack {
 	
 	private Set<Integer> seen = new HashSet<Integer>();
-	
 
 	private int castCount = 0;
 	
+	final Map<Side, GenServer> portSenders = new HashMap<Side, GenServer>();
+	final Map<Side, byte[]> listenerAddresses = new HashMap<Side, byte[]>();
+	final Map<Side, Integer> listenerPorts = new HashMap<Side, Integer>();
 	
-	public class State {
-		final Map<Side, GenServer> portSenders = new HashMap<Side, GenServer>();
-		final Map<Side, byte[]> listenerAddresses = new HashMap<Side, byte[]>();
-		final Map<Side, Integer> listenerPorts = new HashMap<Side, Integer>();
-	}
+
 	
 	///////////////////////////////////////////
 
 	@Override
 	public CallResult init(Object[] args) {
-		State state = new State();
-		state.listenerAddresses.put(Side.UE, (byte[])args[0]);
-		state.listenerPorts.put(Side.UE, (Integer)args[1]);
-		state.listenerAddresses.put(Side.SP, (byte[])args[2]);
-		state.listenerPorts.put(Side.SP, (Integer)args[3]);
-		return new CallResult(Atom.OK, state);
+	
+		listenerAddresses.put(Side.UE, (byte[])args[0]);
+		listenerPorts.put(Side.UE, (Integer)args[1]);
+		listenerAddresses.put(Side.SP, (byte[])args[2]);
+		listenerPorts.put(Side.SP, (Integer)args[3]);
+		
+		return new CallResult(Atom.OK, null);
 	}
 
 	@Override
 	public CallResult handleCast(Object message, Object state) {
 		
 		castCount++;
-		
-		final State pxState = (State)state;
-		
+
 		MsgBase mb = (MsgBase)message;
 		if (mb instanceof PortSendersMsg) {
 			
 			PortSendersMsg plm = (PortSendersMsg)mb;
 			
-			pxState.portSenders.put(Side.UE, plm.uePortSender);
-			pxState.portSenders.put(Side.SP, plm.spPortSender);
+			portSenders.put(Side.UE, plm.uePortSender);
+			portSenders.put(Side.SP, plm.spPortSender);
 
 			return new CallResult(Atom.NOREPLY, state);
 		}
@@ -64,7 +61,7 @@ public final class PxCb implements CallBack {
 			final Side side = kam.side;
 			final Side otherSide = otherSide(side);
 			Util.trace(Level.verbose, "PX received k-a-message, %s -> %s", side.toString(), otherSide.toString());
-			GenServer gsForward = pxState.portSenders.get(otherSide);
+			GenServer gsForward = portSenders.get(otherSide);
 			gsForward.cast(kam);
 			return new CallResult(Atom.NOREPLY, state);
 		}
@@ -118,10 +115,10 @@ public final class PxCb implements CallBack {
 							}
 						}
 
-						final byte[] listenerAddress = ((State)state).listenerAddresses.get(otherSide);
+						final byte[] listenerAddress = listenerAddresses.get(otherSide);
 
 						final Integer localPort =
-								(Integer) ((State)state).portSenders.get(otherSide(ism.side)).call(new GetLocalPortMsg());
+								(Integer) portSenders.get(otherSide(ism.side)).call(new GetLocalPortMsg());
 
 						String newVia =
 								String.format("Via: SIP/2.0/UDP %s:%s;rport;branch=%s",
@@ -133,7 +130,7 @@ public final class PxCb implements CallBack {
 						prepend(newVia, vv);
 
 						Util.trace(Level.verbose, "proxy casting, count: %d", castCount);
-						final GenServer gsForward = ((State)state).portSenders.get(otherSide);
+						final GenServer gsForward = portSenders.get(otherSide);
 						gsForward.cast(ism);
 					}
 					else if (isResponse(sm)) {

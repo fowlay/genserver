@@ -6,6 +6,7 @@ import java.util.Map;
 
 public final class Util {
 	
+	final public static int TIMEOUT_ZERO = 0;
 
 
 	// TODO, move elsewhere?

@@ -20,14 +20,10 @@ public final class RespSenderCb implements CallBack {
 	
 	private Side side;
 
-	class State {
-	}
-	
-
 	@Override
 	public CallResult init(Object[] args) {
 		this.side = (Side)args[0];
-		return new CallResult(Atom.OK, new State());
+		return new CallResult(Atom.OK, null);
 	}
 
 	@Override
@@ -79,7 +75,7 @@ public final class RespSenderCb implements CallBack {
 
 	@Override
 	public CallResult handleInfo(Object message, Object state) {
-		// TODO Auto-generated method stub
+		// not used
 		return null;
 	}
 
