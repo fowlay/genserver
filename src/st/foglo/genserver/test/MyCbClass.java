@@ -6,42 +6,36 @@ import st.foglo.genserver.Atom;
 
 public final class MyCbClass implements CallBack {
 	
-	public final class MyState {
-		// could be int as well
-	    public Integer count = 0;
-	}
-
+	private int count = 0;
     
     /////////////////////
 
     @Override
-    public CallResult init(Object[] args) {
-        // ignore args for now
-        return new CallResult(Atom.OK, null, new MyState());
+    public CallResult init(Object[] ignoredArgs) {
+        return new CallResult(Atom.OK);
     }
 
     @Override
-    public CallResult handleCast(Object message, Object state) {
-        Integer u = ((MyState)state).count;
-        int uNew = u.intValue() + 1;
-        ((MyState)state).count = Integer.valueOf(uNew);
+    public CallResult handleCast(Object message) {
+
+    	count++;
         
-        System.out.println(String.format("new value: %d", uNew));
+        System.out.println(String.format("new value: %d", count));
         
-        return new CallResult(Atom.NOREPLY, null, state, -1);
+        return new CallResult(Atom.NOREPLY, CallResult.TIMEOUT_NEVER);
     }
 
     @Override
-    public CallResult handleInfo(Object message, Object state) {
+    public CallResult handleInfo(Object message) {
     	return null;
     }
 
     @Override
-    public CallResult handleCall(Object message, Object state) {
+    public CallResult handleCall(Object message) {
         return null;
     }
 
     @Override
-    public void handleTerminate(Object state) {
+    public void handleTerminate() {
     }
 }

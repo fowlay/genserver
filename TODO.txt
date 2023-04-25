@@ -1,9 +1,22 @@
 
 
-Refactoring: Do not pass an object around. All state is in instance variables of the callback class.
+DONE: Refactoring: Do not pass an object around. All state is in instance
+variables of the callback class.
+
+-------------------------------------
+
+Refactoring: Create public inner classes named Args in the callback
+modules. In that way the init function can deal with named and typed
+arguments.
 
 
-Refactoring: Create public inner classes named Args in the callback modules. In that way the init function can deal with named and typed arguments.
+Refactoring: Consider pulling the Atom enum into GenServer. Maybe revise
+the naming .. use "status" for ok/reply/noreply/stop?
 
 
-Refactoring - major: Use just a single "transport" callback class on each side, handling all listening and sending. Presumably a single socket on each side is enough.
+Cleanup: Revise the trace messages.
+
+
+Refactoring - major: Use just a single "transport" callback class on
+each side, handling all listening and sending. Presumably a single
+socket on each side is enough. This design should be way simpler.

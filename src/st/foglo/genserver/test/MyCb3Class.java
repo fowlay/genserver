@@ -28,30 +28,30 @@ public final class MyCb3Class implements CallBack {
 
 	@Override
 	public CallResult init(Object[] args) {
-		return new CallResult(Atom.OK, null, new Object());
+		return new CallResult(Atom.OK);
 	}
 
 	@Override
-	public CallResult handleCast(Object message, Object state) {
-		return new CallResult(Atom.STOP, null, state);
+	public CallResult handleCast(Object message) {
+		return new CallResult(Atom.STOP);
 	}
 
 	@Override
-	public CallResult handleInfo(Object message, Object state) {
+	public CallResult handleInfo(Object message) {
 		return null;
 	}
 
 	@Override
-	public CallResult handleCall(Object message, Object state) {
+	public CallResult handleCall(Object message) {
 		
 		int x = ((TwoFactors)message).x;
 		int y = ((TwoFactors)message).y;
 		System.out.println("multiply");
-		return new CallResult(Atom.REPLY, new Product(x*y), state);
+		return new CallResult(Atom.REPLY, new Product(x*y));
 	}
 
 	@Override
-	public void handleTerminate(Object state) {
+	public void handleTerminate() {
 		System.out.println("terminating server");
 	}
 }

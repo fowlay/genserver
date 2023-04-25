@@ -34,54 +34,15 @@ public final class PsCb implements CallBack {
 	int castCount = 0;
 
 	
-	
-//	public class State {
-//		final Side side;
-//		
-//		/** outbound proxy address */
-//		final byte[] peerAddr;
-//		
-//		/** outbound proxy port */
-//		final Integer peerPort;
-//		
-//		DatagramSocket socket;   // may be updated, so not final
-//		
-//		final GenServer proxy;
-//		
-//		int handleInfoCount = 0;
-//		
-//		int receiveCount = 0;
-//
-//		public State(Side side,
-//				byte[] peerAddr,
-//				Integer peerPort,
-//				DatagramSocket socket,
-//				GenServer proxy) {
-//			super();
-//			this.side = side;
-//			this.peerAddr = peerAddr;
-//			this.peerPort = peerPort;
-//			this.socket = socket;
-//			this.proxy = proxy;
-//		}
-//		
-//
-//	}
-	
-	
-	
 	////////////////////////////////
 	
 	@Override
 	public CallResult init(Object[] args) {
-		
-		// TODO - no need to store 'side' in the state, since an instance variable is used
-		
+
 		side = (Side)args[0];
 		
 		peerAddr = (byte[])args[1];
 		peerPort = ((Integer)args[2]).intValue();
-		
 		proxy = (GenServer)args[3];
 		
 		socket = null;
@@ -99,12 +60,12 @@ public final class PsCb implements CallBack {
 			System.exit(1);
 		}
 
-		return new CallResult(Atom.OK, null, null, Util.TIMEOUT_ZERO);
+		return new CallResult(Atom.OK, CallResult.TIMEOUT_ZERO);
 	}
 	
 
 	@Override
-	public CallResult handleCast(Object message, Object state) {
+	public CallResult handleCast(Object message) {
 		
 		castCount++;
 		
@@ -161,23 +122,23 @@ public final class PsCb implements CallBack {
 				System.exit(1);
 			}
 		}
-		return new CallResult(Atom.NOREPLY, null, state, Util.TIMEOUT_ZERO);
+		return new CallResult(Atom.NOREPLY, CallResult.TIMEOUT_ZERO);
 	}
 
 	
 
 	@Override
-	public CallResult handleCall(Object message, Object state) {
+	public CallResult handleCall(Object message) {
 		MsgBase mb = (MsgBase)message;
 		if (mb instanceof GetLocalPortMsg) {
 			final int localPort = socket.getLocalPort();
-			return new CallResult(Atom.REPLY, Integer.valueOf(localPort), state);
+			return new CallResult(Atom.REPLY, Integer.valueOf(localPort));
 		}
-		return new CallResult(Atom.REPLY, Integer.valueOf(-1), state);
+		return new CallResult(Atom.REPLY, Integer.valueOf(-1));
 	}
 
 	@Override
-	public CallResult handleInfo(Object message, Object state) {
+	public CallResult handleInfo(Object message) {
 		// copypasted from PlCb
 
 		handleInfoCount++;
@@ -195,7 +156,7 @@ public final class PsCb implements CallBack {
 
 			if (recLength <= 4) {   // TODO, hard code
 				// assume a keep-alive message
-				Util.trace(Level.verbose, "%s sender-listener received: %s", toString(), Util.bytesToString(buffer, recLength));
+				Util.trace(Level.verbose, "%s sender-listener received: %s", side.toString(), Util.bytesToString(buffer, recLength));
 				final KeepAliveMessage kam = new KeepAliveMessage(side, buffer, recLength);
 				proxy.cast(kam);
 			}
@@ -205,7 +166,7 @@ public final class PsCb implements CallBack {
 					sb.append((char) buffer[j]);
 				}
 				
-				Util.trace(Level.verbose, "%s sender-listener received:%n%s", toString(), sb.toString());
+				Util.trace(Level.verbose, "%s sender-listener received:%n%s", side.toString(), sb.toString());
 				
 				final SipMessage sipMessage =
 						new SipMessage(buffer, recLength);
@@ -222,19 +183,19 @@ public final class PsCb implements CallBack {
 			}
 
 
-			return new CallResult(Atom.NOREPLY, null, null, Util.TIMEOUT_ZERO);
+			return new CallResult(Atom.NOREPLY, CallResult.TIMEOUT_ZERO);
 			
 		} catch (SocketTimeoutException e) {
 			// Util.trace(Level.debug, "%s socket receive timeout", toString());
 
-			return new CallResult(Atom.NOREPLY, null, null, Util.TIMEOUT_ZERO);
+			return new CallResult(Atom.NOREPLY, CallResult.TIMEOUT_ZERO);
 
 		}
 		catch (PortUnreachableException e) {
 			Util.trace(Level.verbose, "PUE, listener-sender on side: %s, handleInfo: %d, receive: %d",
 					side.toString(), handleInfoCount, receiveCount);
 
-			return new CallResult(Atom.NOREPLY, null, null, Util.TIMEOUT_ZERO);
+			return new CallResult(Atom.NOREPLY, CallResult.TIMEOUT_ZERO);
 			
 		}
 		catch (IOException e) {
@@ -242,12 +203,12 @@ public final class PsCb implements CallBack {
 			e.printStackTrace();
 		}
 
-		return new CallResult(Atom.NOREPLY, null, null, Util.TIMEOUT_ZERO);
+		return new CallResult(Atom.NOREPLY, CallResult.TIMEOUT_ZERO);
 
 	}
 
 	@Override
-	public void handleTerminate(Object state) {
+	public void handleTerminate() {
 	}
 	
 	public String toString() {

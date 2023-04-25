@@ -50,32 +50,22 @@ public class PlCb implements CallBack {
 		
 	    portSender = (GenServer)args[4];
 		
-		return new CallResult(
-				Atom.OK,
-				null,
-//				new State(
-//						(Side)args[0],
-//						(GenServer)args[1],
-//						port,
-//						socket,
-//						(GenServer)args[4]),
-				null,
-				Util.TIMEOUT_ZERO);
+		return new CallResult(Atom.OK, CallResult.TIMEOUT_ZERO);
 	}
 
 	@Override
-	public CallResult handleCast(Object message, Object state) {
+	public CallResult handleCast(Object message) {
 		Util.trace(Level.debug, "%s unexpected", toString());
-		return new CallResult(Atom.NOREPLY, state);
+		return new CallResult(Atom.NOREPLY);
 	}
 
 	@Override
-	public CallResult handleCall(Object message, Object state) {
-		return null;
+	public CallResult handleCall(Object message) {
+		throw new UnsupportedOperationException();
 	}
 
 	@Override
-	public CallResult handleInfo(Object message, Object state) {
+	public CallResult handleInfo(Object message) {
 		
 		// read from the socket, with a timeout
 
@@ -94,6 +84,9 @@ public class PlCb implements CallBack {
 			
 			
 			// microSIP special handling
+			
+			// update the port-sender process to use same address and port
+			// that the current message was received from
 			if ((!hasUpdatedPortSender) && side == Side.UE) {
 				
 				final InetSocketAddress socketAddr = (InetSocketAddress) p.getSocketAddress();
@@ -155,11 +148,11 @@ public class PlCb implements CallBack {
 			e.printStackTrace();
 		}
 
-		return new CallResult(Atom.NOREPLY, null, state, Util.TIMEOUT_ZERO);
+		return new CallResult(Atom.NOREPLY, CallResult.TIMEOUT_ZERO);
 	}
 
 	@Override
-	public void handleTerminate(Object state) {
+	public void handleTerminate() {
 	}
 	
 

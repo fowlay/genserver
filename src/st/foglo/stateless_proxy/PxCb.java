@@ -42,7 +42,7 @@ public final class PxCb implements CallBack {
 	}
 
 	@Override
-	public CallResult handleCast(Object message, Object state) {
+	public CallResult handleCast(Object message) {
 		
 		castCount++;
 
@@ -54,7 +54,7 @@ public final class PxCb implements CallBack {
 			portSenders.put(Side.UE, plm.uePortSender);
 			portSenders.put(Side.SP, plm.spPortSender);
 
-			return new CallResult(Atom.NOREPLY, state);
+			return new CallResult(Atom.NOREPLY);
 		}
 		else if (mb instanceof KeepAliveMessage) {
 			final KeepAliveMessage kam = (KeepAliveMessage)message;
@@ -63,7 +63,7 @@ public final class PxCb implements CallBack {
 			Util.trace(Level.verbose, "PX received k-a-message, %s -> %s", side.toString(), otherSide.toString());
 			GenServer gsForward = portSenders.get(otherSide);
 			gsForward.cast(kam);
-			return new CallResult(Atom.NOREPLY, state);
+			return new CallResult(Atom.NOREPLY);
 		}
 		else if (mb instanceof InternalSipMessage) {
 			
@@ -72,7 +72,7 @@ public final class PxCb implements CallBack {
 			if (seen.contains(ism.digest)) {
 				// ignore this resend
 				Util.trace(Level.verbose, "PX ------------- ignore resend from %s: %d", ism.side.toString(), ism.digest.intValue());
-				return new CallResult(Atom.NOREPLY, state);
+				return new CallResult(Atom.NOREPLY);
 			}
 			else {
 				
@@ -176,26 +176,26 @@ public final class PxCb implements CallBack {
 					System.exit(1);
 				}
 			}
-			return new CallResult(Atom.NOREPLY, state);
+			return new CallResult(Atom.NOREPLY);
 		}
 		else {
 			// make some noise
-			return new CallResult(Atom.NOREPLY, state);
+			return new CallResult(Atom.NOREPLY);
 		}
 	}
 
 	@Override
-	public CallResult handleCall(Object message, Object state) {
+	public CallResult handleCall(Object message) {
 		return null;
 	}
 
 	@Override
-	public CallResult handleInfo(Object message, Object state) {
+	public CallResult handleInfo(Object message) {
 		return null;
 	}
 
 	@Override
-	public void handleTerminate(Object state) {
+	public void handleTerminate() {
 
 	}
 

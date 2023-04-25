@@ -1,28 +1,33 @@
 package st.foglo.genserver;
 
+
 public final class CallResult {
     
+	public static final long TIMEOUT_ZERO = 0;
+	public static final long TIMEOUT_NEVER = -1;
+	
     final Atom code;
-    
-    final Object newState;
-    
     final Object reply;
-    
     final long timeoutMillis;
     
     //////////////////////////////////
     
-    public CallResult(Atom word, Object newState) {
-    	this(word, null, newState);
-    }
-
-    public CallResult(Atom word, Object reply, Object newState) {
-    	this(word, reply, newState, -1);
+    public CallResult(Atom word) {
+    	this(word, null, TIMEOUT_NEVER);
     }
     
-    public CallResult(Atom word, Object reply, Object newState, int timeoutMillis) {
+    public CallResult(Atom word, Object reply) {
+    	this(word, reply, TIMEOUT_NEVER);
+    }
+    
+    
+    public CallResult(Atom word, long timeoutMillis) {
+    	this(word, null, timeoutMillis);
+    }
+
+    
+    public CallResult(Atom word, Object reply, long timeoutMillis) {
         this.code = word;
-        this.newState = newState;
         this.reply = reply;
         this.timeoutMillis = timeoutMillis;
     }

@@ -25,9 +25,6 @@ public final class GenServer implements Runnable {
     private Object monitorInitialized = new Object();
     private volatile boolean initialized = false;
     
-    
-    private Object state;
-    
     private final int msgLevel;
 
     private class GsMessage {
@@ -120,8 +117,6 @@ public final class GenServer implements Runnable {
     		initialized = true;
 		}
 
-        state = cr.newState;
-        
         for (; true; ) {
 
         	final boolean isEmptyMessageQueue;
@@ -147,14 +142,13 @@ public final class GenServer implements Runnable {
 //        					else {
             					// trace("continue after timeout");
             					GsMessage message = new GsMessage(Atom.TIMEOUT, null);
-            					CallResult crInfo = cb.handleInfo(message, state);
+            					CallResult crInfo = cb.handleInfo(message);
             					
             					if (crInfo.code == Atom.STOP) {
-            						cb.handleTerminate(crInfo.newState);
+            						cb.handleTerminate();
             						break;
             					}
             					else {
-            						state = crInfo.newState;
             						timeout = crInfo.timeoutMillis;
             					}
 //        					}
@@ -182,8 +176,7 @@ public final class GenServer implements Runnable {
         		}
         		
         		if (m.keyword == Atom.CAST) {
-        			cr = cb.handleCast(m.object, state);
-        			state = cr.newState;
+        			cr = cb.handleCast(m.object);
         			
         			if (cr.timeoutMillis >= 0) {
         				synchronized (monitorTimeout) {
@@ -192,14 +185,13 @@ public final class GenServer implements Runnable {
         			}
         			
         			if (cr.code == Atom.STOP) {
-        				cb.handleTerminate(state);
+        				cb.handleTerminate();
         			}
         		}
         		else if (m.keyword == Atom.CALL) {
         			// trace("perform a call");
-        			cr = cb.handleCall(m.object, state);
+        			cr = cb.handleCall(m.object);
         			// trace("callback executed");
-        			state = cr.newState;
         			
         			if (cr.timeoutMillis >= 0) {
         				synchronized (monitorTimeout) {

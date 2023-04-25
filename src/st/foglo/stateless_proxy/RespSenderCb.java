@@ -27,7 +27,7 @@ public final class RespSenderCb implements CallBack {
 	}
 
 	@Override
-	public CallResult handleCast(Object message, Object state) {
+	public CallResult handleCast(Object message) {
 		// handle a message to be sent; address and port also passed in
 		// after sending, terminate
 		
@@ -64,23 +64,23 @@ public final class RespSenderCb implements CallBack {
 			
 		}
 
-		return new CallResult(Atom.STOP, state);
+		return new CallResult(Atom.STOP);
 	}
 
 	@Override
-	public CallResult handleCall(Object message, Object state) {
+	public CallResult handleCall(Object message) {
 		// not used
 		return null;
 	}
 
 	@Override
-	public CallResult handleInfo(Object message, Object state) {
+	public CallResult handleInfo(Object message) {
 		// not used
 		return null;
 	}
 
 	@Override
-	public void handleTerminate(Object state) {
+	public void handleTerminate() {
 		Util.trace(Level.debug, "%s terminating", side.toString());
 	}
 
