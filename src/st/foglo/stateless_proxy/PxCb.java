@@ -10,6 +10,7 @@ import java.util.HashSet;
 import st.foglo.genserver.CallBack;
 import st.foglo.genserver.CallResult;
 import st.foglo.genserver.GenServer;
+import st.foglo.stateless_proxy.Util.Direction;
 import st.foglo.stateless_proxy.Util.Level;
 import st.foglo.genserver.Atom;
 
@@ -19,24 +20,36 @@ import st.foglo.genserver.Atom;
 public final class PxCb implements CallBack {
 	
 	private Set<Integer> seen = new HashSet<Integer>();
+	
+	private int trCount = 1;
 
-	private int castCount = 0;
+	// private int castCount = 0;
 	
 	final Map<Side, GenServer> portSenders = new HashMap<Side, GenServer>();
 	final Map<Side, byte[]> listenerAddresses = new HashMap<Side, byte[]>();
 	final Map<Side, Integer> listenerPorts = new HashMap<Side, Integer>();
 	
 
+	public PxCb(byte[] sipAddrUe, Integer sipPortUe, byte[] sipAddrSp, Integer sipPortSp) {
+		
+		listenerAddresses.put(Side.UE, sipAddrUe);
+		listenerPorts.put(Side.UE, sipPortUe);
+		listenerAddresses.put(Side.SP, sipAddrSp);
+		listenerPorts.put(Side.SP, sipPortSp);
+		
+	}
 	
 	///////////////////////////////////////////
 
 	@Override
 	public CallResult init(Object[] args) {
-	
-		listenerAddresses.put(Side.UE, (byte[])args[0]);
-		listenerPorts.put(Side.UE, (Integer)args[1]);
-		listenerAddresses.put(Side.SP, (byte[])args[2]);
-		listenerPorts.put(Side.SP, (Integer)args[3]);
+		
+		Util.seq(Level.verbose, Side.PX, Util.Direction.NONE, "init");
+		
+//		listenerAddresses.put(Side.UE, (byte[])args[0]);
+//		listenerPorts.put(Side.UE, (Integer)args[1]);
+//		listenerAddresses.put(Side.SP, (byte[])args[2]);
+//		listenerPorts.put(Side.SP, (Integer)args[3]);
 		
 		return new CallResult(Atom.OK, null);
 	}
@@ -44,10 +57,10 @@ public final class PxCb implements CallBack {
 	@Override
 	public CallResult handleCast(Object message) {
 		
-		castCount++;
-
 		MsgBase mb = (MsgBase)message;
 		if (mb instanceof PortSendersMsg) {
+			
+			Util.seq(Level.verbose, Side.PX, Util.Direction.NONE, "tell proxy about port senders");
 			
 			PortSendersMsg plm = (PortSendersMsg)mb;
 			
@@ -60,7 +73,10 @@ public final class PxCb implements CallBack {
 			final KeepAliveMessage kam = (KeepAliveMessage)message;
 			final Side side = kam.side;
 			final Side otherSide = otherSide(side);
-			Util.trace(Level.verbose, "PX received k-a-message, %s -> %s", side.toString(), otherSide.toString());
+			//Util.trace(Level.verbose, "PX received k-a-m, %s -> %s", side.toString(), otherSide.toString());
+			
+			Util.seq(Level.verbose, Side.PX, direction(side, otherSide), "k-a-m");
+			
 			GenServer gsForward = portSenders.get(otherSide);
 			gsForward.cast(kam);
 			return new CallResult(Atom.NOREPLY);
@@ -69,14 +85,16 @@ public final class PxCb implements CallBack {
 			
 			InternalSipMessage ism = (InternalSipMessage)message;
 			
-			if (seen.contains(ism.digest)) {
+			if (seen.contains(ism.digest) && System.currentTimeMillis() == 314) {
 				// ignore this resend
-				Util.trace(Level.verbose, "PX ------------- ignore resend from %s: %d", ism.side.toString(), ism.digest.intValue());
+				// Util.trace(Level.verbose, "PX ------------- ignore resend from %s: %d", ism.side.toString(), ism.digest.intValue());
 				return new CallResult(Atom.NOREPLY);
 			}
 			else {
 				
-				seen.add(ism.digest);
+				if (System.currentTimeMillis() == 314) {
+					seen.add(ism.digest);
+				}
 			
 				try {
 				
@@ -85,12 +103,14 @@ public final class PxCb implements CallBack {
 					final Side side = ism.side;
 					final Side otherSide = otherSide(side);
 			
-					Util.trace(
-							Level.verbose,
-							"PX received from %s [%d]:%n%s",
-							ism.side.toString(),
-							ism.digest.intValue(),
-							sm.toString());
+//					Util.trace(
+//							Level.verbose,
+//							"PX received from %s [%d]:%n%s",
+//							ism.side.toString(),
+//							ism.digest.intValue(),
+//							sm.toString());
+					
+					//Util.seq(Level.verbose, Side.PX, direction(side, otherSide), sm.firstLine);
 
 					
 
@@ -98,7 +118,8 @@ public final class PxCb implements CallBack {
 					
 						// modify before passing on
 					
-						Util.trace(Level.debug, "PX forwarding a request");
+						//Util.trace(Level.debug, "PX forwarding a request");
+						Util.seq(Level.verbose, Side.PX, direction(side, otherSide), sm.firstLine);
 
 						String mf = sm.headers.get("Max-Forwards").get(0);
 						int mfValue = Integer.parseInt(mf.substring(mf.indexOf(':')+1).trim());
@@ -129,12 +150,14 @@ public final class PxCb implements CallBack {
 
 						prepend(newVia, vv);
 
-						Util.trace(Level.verbose, "proxy casting, count: %d", castCount);
+						//Util.trace(Level.verbose, "proxy casting, count: %d", castCount);
 						final GenServer gsForward = portSenders.get(otherSide);
 						gsForward.cast(ism);
 					}
 					else if (isResponse(sm)) {
 						// a response .. easy, just drop topmost via and use new top via as destination
+						
+						Util.seq(Level.verbose, Side.PX, direction(side, otherSide), sm.firstLine);
 
 						List<String> vias = sm.headers.get("Via");
 						List<String> newVias = dropFirst(vias);
@@ -156,8 +179,9 @@ public final class PxCb implements CallBack {
 
 						final GenServer transientSender =
 								GenServer.start(
-										new RespSenderCb(),
-										new Object[]{otherSide(ism.side)});
+										new RespSenderCb(otherSide),
+										new Object[]{},
+										String.format("tr-sender-%d", trCount++));
 
 						InternalSipMessage newIsm = new InternalSipMessage(
 								ism.side,
@@ -165,6 +189,9 @@ public final class PxCb implements CallBack {
 								Integer.valueOf(0),
 								toByteArray(destAddr),
 								Integer.valueOf(Integer.parseInt(destPort)));
+						
+						
+						
 						transientSender.cast(newIsm);
 					}
 					else {
@@ -184,19 +211,30 @@ public final class PxCb implements CallBack {
 		}
 	}
 
+	private Direction direction(Side from, Side to) {
+		if (from == Side.UE && to == Side.SP) {
+			return Direction.SP;
+		}
+		else if (from == Side.SP && to == Side.UE) {
+			return Direction.UE;
+		}
+		else {
+			throw new RuntimeException();
+		}
+	}
+
 	@Override
 	public CallResult handleCall(Object message) {
-		return null;
+		throw new UnsupportedOperationException();
 	}
 
 	@Override
 	public CallResult handleInfo(Object message) {
-		return null;
+		throw new UnsupportedOperationException();
 	}
 
 	@Override
 	public void handleTerminate() {
-
 	}
 
 	private Side otherSide(Side side) {
@@ -204,6 +242,8 @@ public final class PxCb implements CallBack {
 	}
 
 	private boolean isRequest(SipMessage sm) {
+		//Util.trace(Level.verbose, "+++ message first line: %s", sm.firstLine);
+		//Util.trace(Level.verbose, "+++ ends SIP/2.0? %b", sm.firstLine.endsWith("SIP/2.0"));
 		return sm.firstLine.endsWith("SIP/2.0");
 	}
 

@@ -4,8 +4,8 @@ import java.util.LinkedList;
 import java.util.Queue;
 //import java.util.concurrent.ConcurrentLinkedQueue;
 
-import st.foglo.stateless_proxy.Util;
-import st.foglo.stateless_proxy.Util.Level;
+//import st.foglo.stateless_proxy.Util;
+//import st.foglo.stateless_proxy.Util.Level;
 
 public final class GenServer implements Runnable {
 
@@ -25,8 +25,8 @@ public final class GenServer implements Runnable {
     private Object monitorInitialized = new Object();
     private volatile boolean initialized = false;
     
-    private final int msgLevel;
-
+    final int msgLevel;
+    
     private class GsMessage {
         
         final Atom keyword;
@@ -57,9 +57,25 @@ public final class GenServer implements Runnable {
     	return start(cb, args, 0);
     }
     
+    public static GenServer start(CallBack cb, Object[] args, String name) {
+    	final GenServer gs = new GenServer(cb, args, -1);
+    	final Thread thread = new Thread(gs, name);
+    	thread.start();
+    	gs.waitForInit();
+        return gs;
+    }
+    
     public static GenServer start(CallBack cb, Object[] args, int trace) {
     	final GenServer gs = new GenServer(cb, args, trace);
     	final Thread thread = new Thread(gs);
+    	thread.start();
+    	gs.waitForInit();
+        return gs;
+    }
+    
+    public static GenServer start(CallBack cb, Object[] args, String name, int trace) {
+    	final GenServer gs = new GenServer(cb, args, trace);
+    	final Thread thread = new Thread(gs, name);
     	thread.start();
     	gs.waitForInit();
         return gs;
@@ -131,35 +147,27 @@ public final class GenServer implements Runnable {
         		synchronized (monitorTimeout) {
         			try {
         				if (timeout >= 0) {
-        					//trace("wait limited: %d", timeout);
         					if (timeout > 0) {
         						monitorTimeout.wait(timeout);
         					}
-//        					if (timeout == -1) {
-//        						trace("notified during limited wait");
-//        						continue;
-//        					}
-//        					else {
-            					// trace("continue after timeout");
-            					GsMessage message = new GsMessage(Atom.TIMEOUT, null);
-            					CallResult crInfo = cb.handleInfo(message);
+
+        					GsMessage message = new GsMessage(Atom.TIMEOUT, null);
+        					CallResult crInfo = cb.handleInfo(message);
             					
-            					if (crInfo.code == Atom.STOP) {
-            						cb.handleTerminate();
-            						break;
-            					}
-            					else {
-            						timeout = crInfo.timeoutMillis;
-            					}
-//        					}
+        					if (crInfo.code == Atom.STOP) {
+        						cb.handleTerminate();
+        						break;
+        					}
+        					else {
+        						timeout = crInfo.timeoutMillis;
+        					}
+
         				}
         				else {
         					monitorTimeout.wait();
-        					trace("notified during infinite wait");
         				}
 						
 					} catch (InterruptedException e) {
-						// should not happen?
 						e.printStackTrace();
 					}
 				}
@@ -168,10 +176,7 @@ public final class GenServer implements Runnable {
         		final GsMessage m;
         		synchronized(monitorMessageQueue) {
         			synchronized (messageQueue) {
-        				Util.trace(Level.verbose, "about to remove, thread: %s, queue size: %d", Thread.currentThread().toString(), messageQueue.size());
         				m = messageQueue.remove();
-        				Util.trace(Level.verbose, "    done remove, thread: %s, queue size: %d", Thread.currentThread().toString(), messageQueue.size());
-        				Util.trace(Level.verbose, "    done remove, thread: %s, queue stat: %s", Thread.currentThread().toString(), messageQueue.isEmpty() ? "empty" : "non-empty");
         			}
         		}
         		
@@ -189,9 +194,7 @@ public final class GenServer implements Runnable {
         			}
         		}
         		else if (m.keyword == Atom.CALL) {
-        			// trace("perform a call");
         			cr = cb.handleCall(m.object);
-        			// trace("callback executed");
         			
         			if (cr.timeoutMillis >= 0) {
         				synchronized (monitorTimeout) {
@@ -200,7 +203,6 @@ public final class GenServer implements Runnable {
         			}
         			
         			synchronized(monitorCallResult) {
-        				// wait for result to get fetched
         				callResult = cr;
         				try {
         					monitorCallResult.wait();
@@ -218,9 +220,7 @@ public final class GenServer implements Runnable {
     	synchronized(monitorMessageQueue) {
     		synchronized (messageQueue) {
         		wasEmpty = messageQueue.isEmpty();
-        		Util.trace(Level.verbose, "before insert, thread: %s, size: %d", Thread.currentThread().toString(), messageQueue.size());
         		messageQueue.add(message);
-        		Util.trace(Level.verbose, " after insert, thread: %s, size: %d", Thread.currentThread().toString(), messageQueue.size());
 			}
     	}
     	
@@ -236,11 +236,11 @@ public final class GenServer implements Runnable {
     
     
     
-    private void trace(String s) {
-    	if (msgLevel >= 1) {
-    		System.err.println("GenServer: " + String.format(s));
-    	}
-    }
+//    private void trace(String s) {
+//    	if (msgLevel >= 1) {
+//    		System.err.println("GenServer: " + String.format(s));
+//    	}
+//    }
     
 //    private void trace(String s, int j) {
 //    	if (msgLevel >= 1) {

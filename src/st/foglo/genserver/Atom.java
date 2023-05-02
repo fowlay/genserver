@@ -1,3 +1,4 @@
+
 package st.foglo.genserver;
 
 public enum Atom {

@@ -10,6 +10,7 @@ import java.net.SocketAddress;
 import st.foglo.genserver.Atom;
 import st.foglo.genserver.CallBack;
 import st.foglo.genserver.CallResult;
+import st.foglo.stateless_proxy.Util.Direction;
 import st.foglo.stateless_proxy.Util.Level;
 
 /**
@@ -18,11 +19,19 @@ import st.foglo.stateless_proxy.Util.Level;
  */
 public final class RespSenderCb implements CallBack {
 	
-	private Side side;
+	final Side side;
+	
+	public RespSenderCb(Side side) {
+		this.side = side;
+	}
+	
+	///////////////////
 
 	@Override
 	public CallResult init(Object[] args) {
-		this.side = (Side)args[0];
+		
+		Util.seq(Level.verbose, side, Util.Direction.NONE, "init");
+		
 		return new CallResult(Atom.OK, null);
 	}
 
@@ -37,6 +46,7 @@ public final class RespSenderCb implements CallBack {
 			final InternalSipMessage ism = (InternalSipMessage) mb;
 			
 			Util.trace(Level.debug, "%s send a forwarded response: %s", side.toString(), ism.message.toString());
+			Util.seq(Level.verbose, side, Direction.OUT, ism.message.firstLine);
 			
             // assume destination is provided with the message
 		

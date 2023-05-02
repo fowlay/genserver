@@ -9,6 +9,7 @@ import java.net.SocketTimeoutException;
 import st.foglo.genserver.CallBack;
 import st.foglo.genserver.CallResult;
 import st.foglo.genserver.GenServer;
+import st.foglo.stateless_proxy.Util.Direction;
 import st.foglo.stateless_proxy.Util.Level;
 import st.foglo.genserver.Atom;
 
@@ -17,46 +18,64 @@ import st.foglo.genserver.Atom;
  */
 public class PlCb implements CallBack {
 	
-	private Side side;
-	GenServer proxy;
+	final Side side;
+	final GenServer proxy;
+	
+	final byte[] host;
+	final int port;
+	
+	final GenServer portSender;
+	
 	int listenerPort;
 	DatagramSocket socket = null;
-	GenServer portSender;
+
 	
 	private boolean hasUpdatedPortSender = false;
+	
+	final CallResult result = new CallResult(Atom.NOREPLY, CallResult.TIMEOUT_ZERO);
+
+	public PlCb(Side side, GenServer proxy, byte[] host, Integer port, GenServer portSender) {
+		this.side = side;
+		this.proxy = proxy;
+		this.host = host;
+		this.port = port.intValue();
+		this.portSender = portSender;
+	}
 	
 	///////////////////////////////////
 
 	@Override
 	public CallResult init(Object[] args) {
 		
-		side = (Side)args[0];
+		// side = (Side)args[0];
 		
-		proxy = (GenServer)args[1];
+		Util.seq(Level.verbose, side, Util.Direction.NONE, "init");
 		
-		final byte[] host = (byte[])args[2];
-		final int port = ((Integer)args[3]).intValue();
+		// proxy = (GenServer)args[1];
+		
+		// host = (byte[])args[2];
+		// port = ((Integer)args[3]).intValue();
 		
 		InetAddress localAddr = null;
 		try {
 			localAddr = InetAddress.getByAddress(host);
 			socket = new DatagramSocket(port, localAddr);
-			socket.setSoTimeout(300000); // TODO, hardcoded timeout
+			socket.setSoTimeout(300000); // TODO, hardcoded timeout  // why at all?
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 
 		Util.trace(Util.Level.debug, "%s listener init returns", toString());
 		
-	    portSender = (GenServer)args[4];
+	    // portSender = (GenServer)args[4];
 		
-		return new CallResult(Atom.OK, CallResult.TIMEOUT_ZERO);
+		return result;
 	}
 
 	@Override
 	public CallResult handleCast(Object message) {
 		Util.trace(Level.debug, "%s unexpected", toString());
-		return new CallResult(Atom.NOREPLY);
+		return result;
 	}
 
 	@Override
@@ -82,7 +101,6 @@ public class PlCb implements CallBack {
 			// Got some data!
 			int recLength = p.getLength();
 			
-			
 			// microSIP special handling
 			
 			// update the port-sender process to use same address and port
@@ -100,11 +118,12 @@ public class PlCb implements CallBack {
 			}
 			
 			
-			final InetSocketAddress sa = (InetSocketAddress) p.getSocketAddress();
+			// final InetSocketAddress sa = (InetSocketAddress) p.getSocketAddress();
 			// so where did we get this from?
-			if (side == Side.UE) {
-				Util.trace(Level.verbose, "received from UE, host: %s, port: %s", sa.getHostString(), sa.getPort());
-			}
+//			if (side == Side.UE) {
+//				//Util.trace(Level.verbose, "received from UE, host: %s, port: %s", sa.getHostString(), sa.getPort());
+//				//Util.seq(Level.verbose, side, Direction.IN, String.format("rec fr UE: %s:%s", sa.getHostString(), sa.getPort()));
+//			}
 			
 			StringBuilder sb = new StringBuilder();
 			for (int j = 0; j < recLength; j++) {
@@ -115,7 +134,8 @@ public class PlCb implements CallBack {
 			if (recLength <= 4) {   // TODO, hard code
 				// assume a keep-alive message
 				
-				Util.trace(Level.verbose, "%s listener received: %s", toString(), Util.bytesToString(buffer, recLength));
+				Util.trace(Level.debug, "%s listener received: %s", toString(), Util.bytesToString(buffer, recLength));
+				Util.seq(Level.verbose, side, Direction.IN, "k-a-m");
 				
 				final KeepAliveMessage kam = new KeepAliveMessage(side, buffer, recLength);
 				proxy.cast(kam);
@@ -123,7 +143,7 @@ public class PlCb implements CallBack {
 			}
 			else {
 				
-				Util.trace(Level.verbose, "%s listener received:%n%s", toString(), sb.toString());
+				Util.trace(Level.debug, "%s listener received:%n%s", toString(), sb.toString());
 				
 				SipMessage m =
 						new SipMessage(buffer, recLength);
@@ -135,6 +155,8 @@ public class PlCb implements CallBack {
 								Util.digest(buffer, recLength),
 								null,
 								null);
+				
+				Util.seq(Level.verbose, side, Direction.IN, iMsg.message.firstLine);
 				
 				proxy.cast(iMsg);
 			}
@@ -148,7 +170,7 @@ public class PlCb implements CallBack {
 			e.printStackTrace();
 		}
 
-		return new CallResult(Atom.NOREPLY, CallResult.TIMEOUT_ZERO);
+		return result;
 	}
 
 	@Override

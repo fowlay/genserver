@@ -6,6 +6,23 @@ import java.util.Map;
 
 public final class Util {
 	
+	public enum Direction {
+		IN,
+		OUT,
+		NONE,
+		UE,
+		SP
+	}
+	
+	private static final String[] white = new String[]{
+			"",
+			"               ",
+			"                              ",
+			"                                             ",
+			"                                                            ",
+			"                                                                           "
+	};
+	
 
 	// TODO, move elsewhere?
 	public static byte[] toByteArray(int[] kk) {
@@ -22,12 +39,16 @@ public final class Util {
 	public static void trace(Level level, String s) {
 		display(level, String.format("%s", s));
 	}
-	
+
 	public static void trace(Level level, String format, int j) {
 		display(level, String.format(format, j));
 	}
 	
 	public static void trace(Level level, String format, String s) {
+		display(level, String.format(format, s));
+	}
+	
+	public static void trace(Level level, String format, boolean s) {
 		display(level, String.format(format, s));
 	}
 	
@@ -53,9 +74,54 @@ public final class Util {
 	
 	private static void display(Level level, String line) {
 		if (Main.traceLevel.ordinal() >= level.ordinal()) {
-			System.out.println(ldt() + " " + line);
-			System.out.println();
+			final String threadName = Thread.currentThread().getName();
+			System.out.println(
+			String.format("%s %-15s %s%n", ldt(), threadName, line));
 		}
+	}
+	
+	public static void seq(Level level, Side where, Direction towards, String text) {
+		
+		//System.out.println(String.format("%s|%s|%s|%s", level, where, towards, text));
+		
+		final String arrowLeft = "<--";
+		final String arrowRight = "-->";
+		
+		final String arrow;
+		if (towards == Direction.NONE) {
+			arrow = "";
+		}
+		else if (towards == Direction.IN && where == Side.UE) {
+			arrow = arrowRight;
+		}
+		else if (towards == Direction.IN && where == Side.SP) {
+			arrow = arrowLeft;
+			
+		}
+		else if (towards == Direction.OUT && where == Side.UE) {
+			arrow = arrowLeft;
+		}
+		else if (towards == Direction.OUT && where == Side.SP) {
+			arrow = arrowRight;
+		}
+		else if (towards == Direction.UE && where == Side.PX) {
+			arrow = arrowLeft;
+		}
+		else if (towards == Direction.SP && where == Side.PX) {
+			arrow = arrowRight;
+		}
+		else {
+			throw new RuntimeException();
+			
+		}
+		
+		String whiteSpace =
+				where == Side.UE ? white[0] :
+					where == Side.PX ? white[2] :
+						where == Side.SP ? white[4] :
+							"internal error"; 
+		
+		display(level, String.format("%s%s %s", whiteSpace, arrow, text));
 	}
 
 	public static byte[] toByteArray(SipMessage message) {
@@ -112,7 +178,7 @@ public final class Util {
 	
 	public static String ldt() {
 		final LocalDateTime ldt = LocalDateTime.now();
-		return ldt.toString();
+		return String.format("%s %s", ldt.toString().substring(0, 10), ldt.toString().substring(11, 11+12));
 	}
 	
 

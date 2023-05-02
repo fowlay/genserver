@@ -8,6 +8,7 @@ package st.foglo.stateless_proxy;
  */
 public enum Side {
 	UE,   // User Equipment side
-	SP    // Service Provider side
+	SP,   // Service Provider side
+	PX    // the proxy
 
 }
