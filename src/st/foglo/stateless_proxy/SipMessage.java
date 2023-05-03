@@ -122,6 +122,14 @@ public class SipMessage {
 		}
 	}
 	
+	public boolean isRequest() {
+		return firstLine.endsWith("SIP/2.0");
+	}
+	
+	public boolean isResponse() {
+		return firstLine.startsWith("SIP/2.0");
+	}
+	
 	public String toString() {
 		final byte[] crLf = new byte[]{13, 10};
 		final StringBuilder sb = new StringBuilder();
@@ -140,5 +148,33 @@ public class SipMessage {
 			sb.append(body);
 		}
 		return new String(sb);
+	}
+
+	public boolean isRegisterRequest() {
+		return isRequest() && firstLine.startsWith("REGISTER ");
+	}
+	
+
+	public String getUser() {
+
+		final List<String> toHeaders = getHeaderFields("To");
+		
+		final int posSip = toHeaders.get(0).indexOf("sip:");
+		final int posAtSign = toHeaders.get(0).indexOf('@');
+		
+		return toHeaders.get(0).substring(posSip+4, posAtSign);
+	}
+	
+	
+
+
+	private List<String> getHeaderFields(String key) {
+		final List<String> toHeaderFields = headers.get("To");
+		if (toHeaderFields == null) {
+			throw new RuntimeException();
+		}
+		else {
+			return toHeaderFields;
+		}
 	}
 }

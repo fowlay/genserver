@@ -1,7 +1,7 @@
 
 
-DONE: Refactoring: Do not pass an object around. All state is in instance
-variables of the callback class.
+DONE: Refactoring: Do not pass an object around. All state is in
+instance variables of the callback class.
 
 ---------------------
 
@@ -11,8 +11,8 @@ take the needed initial data.
 
 Keep the init callback still, making it possible to do further
 initialization not taken care of in the constructors, and to pass an
-ok/ignore status to GenServer. In case of ignore, terminate the process
-promptly.
+ok/ignore status to GenServer. In case of ignore, terminate the
+process promptly.
 
 -------------------------------------
 
@@ -20,45 +20,48 @@ DONE: Cleanup: Revise the trace messages.
 
 -------------------------------------
 
-Refactoring: Consider pulling the Atom enum into GenServer. Maybe revise
-the naming .. use "status" for ok/reply/noreply/stop?
+DONE: No transient sender process should be used by the proxy, when
+sending towards core.
 
 -------------------------------------
 
-Refactoring - major: Use just a single "transport" callback class on
-each side, handling all listening and sending. Presumably a single
-socket on each side is enough. This design should be way simpler.
+DONE: Maybe let the proxy drop keep-alive responses?
 
-------------------------------
+------------------------------------
 
-Make the CallBackResult data type specific to the callback:
+DONE: When sending responses towards access, trust the Via header? In
+that way multiple clients could be served? Also then there is no need
+to remember the remote host:port that the request came from (they are
+expected to agree, unless there is a NAT between UE and proxy)
 
-   InitResult
-   CastResult
-   CallResult
-   InfoResult
+-------------------------------------
 
-A base class can be introduced. Make all of this be inner classes in
-GenServer?
+DONE: Refactoring - major: Use just a single "transport" callback
+class on each side, handling all listening and sending. Presumably a
+single socket on each side is enough. This design should be way
+simpler.
 
-----------------------------------
+----------------------------------------
 
-Process registry: A static HashMap (ConcurrentHashMap?) in
-GenServer. A "name" variety of the GenServer.start method. The names
-can be strings or enums or Integers, so let the type of the map be
-Map<Object, GenServer>
+DONE: Terminating INVITE fails: The ACK goes to a random port, instead
+of the pinpoint port. This is so because the transient sender does not
+force the right source port to be used?
 
-Ensure that processes remove themselves from the map upon termination.
+(Even if the signaling is wrong, audio streams get set up!!)
 
-The GenServer.call and .cast methods shall understand how to look up
-process by name. Maybe also check validity of the process, throwing
-an exception in case of bad shape.
+Probably it is a dead-end to use multiple sockets on the core
+side. One should be enough!
 
----------------------------------------
+------------------------------------
 
-Implementation of GenServer "call": Is there a complication when
-several calls are executed in sequence and corresponding results are
-to be collected? Maybe not? Or?
+The proxy is not record-routing. Therefore some messaging will take
+the shortest path, bypassing the proxy. This happens e.g. when the
+MicroSIP client sends BYE. The messaging can be seen in Wireshark.
+
+-------------------------------------
+
+Refactoring: Consider pulling the Atom enum into GenServer. Maybe
+revise the naming .. use "status" for ok/reply/noreply/stop?
 
 ---------------------------------------
 
@@ -71,16 +74,54 @@ Currently, using timeouts, the timeout has to be fairly short (like
 
 ----------------------------------------
 
-The MicroSIP client has configuration options for ports and
-"rport". How are they related to proxy configration parameters?
+A supervisor process could be introduced in Main. But what would the
+value be? It could listen to a configured port for control purposes,
+like orderly shutdown.
 
 ----------------------------------------
 
-Terminating INVITE fails: The ACK goes to a random port, instead of
-the pinpoint port. This is so because the transient sender does not
-force the right source port to be used?
+To be tested: MicroSIP running on different host. LinkSYS telephone
+configured towards the proxy. Do record-routing before testing this.
 
-(Even if the signaling is wrong, audio streams get set up!!)
+----------------------------------------
 
-Probably it is a dead-end to use multiple sockets on the core
-side. One should be enough!
+The MicroSIP client has configuration options for ports and
+"rport". How are they related to proxy configration parameters?
+
+---------------------------------
+
+Blacklisting: Blacklisted patterns from file?
+
+-----------------------------------
+
+GenServer: Should handle the IGNORE result when calling Cb:init().
+There should be some principle of fault handling.
+
+------------------------------
+
+Make the CallBackResult data type specific to the callback:
+
+   InitResult CastResult CallResult InfoResult
+
+A base class can be introduced. Make all of this be inner classes in
+GenServer?
+
+----------------------------------
+
+GenServer: Process registry: A static HashMap (ConcurrentHashMap?) in
+GenServer. A "name" variety of the GenServer.start method. The names
+can be strings or enums or Integers, so let the type of the map be
+Map<Object, GenServer>
+
+Ensure that processes remove themselves from the map upon termination.
+
+The GenServer.call and .cast methods shall understand how to look up
+process by name. Maybe also check validity of the process, throwing an
+exception in case of bad shape.
+
+---------------------------------------
+
+Implementation of GenServer "call": Is there a complication when
+several calls are executed in sequence and corresponding results are
+to be collected? Maybe not? Or?
+

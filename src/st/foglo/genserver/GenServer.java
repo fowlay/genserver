@@ -126,6 +126,10 @@ public final class GenServer implements Runnable {
     public void run() {
     	
     	CallResult cr = cb.init(args);
+    	
+    	// TODO: handling of IGNORE
+    	
+    	
     	synchronized (monitorTimeout) {
     		timeout = cr.timeoutMillis;
 		}

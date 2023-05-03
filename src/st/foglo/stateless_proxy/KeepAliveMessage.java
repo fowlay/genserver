@@ -8,13 +8,19 @@ public final class KeepAliveMessage extends MsgBase {
 	
 	
 	public KeepAliveMessage(Side side, byte[] buffer, int size) {
-		super();
 		this.side = side;
 		this.buffer = buffer;
 		this.size = size;
 	}
 	
-	
-
-
+	public String toString() {
+		final StringBuilder sb = new StringBuilder();
+		for (int k = 0; k < size; k++) {
+			if (k > 0) {
+				sb.append(" ");
+			}
+			sb.append(String.format("%d", buffer[k]));
+		}
+		return sb.toString();
+	}
 }

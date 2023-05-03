@@ -9,6 +9,7 @@ public enum Atom {
     
     // used in CallResult
     OK,
+    IGNORE,
     REPLY,
     NOREPLY,
     STOP

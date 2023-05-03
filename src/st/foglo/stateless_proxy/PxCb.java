@@ -1,5 +1,9 @@
 package st.foglo.stateless_proxy;
 
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+
 import java.util.List;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -21,9 +25,8 @@ public final class PxCb implements CallBack {
 	
 	private Set<Integer> seen = new HashSet<Integer>();
 	
-	private int trCount = 1;
+	private Map<String, SocketAddress> registry = new HashMap<String, SocketAddress>();
 
-	// private int castCount = 0;
 	
 	final Map<Side, GenServer> portSenders = new HashMap<Side, GenServer>();
 	final Map<Side, byte[]> listenerAddresses = new HashMap<Side, byte[]>();
@@ -44,12 +47,14 @@ public final class PxCb implements CallBack {
 	@Override
 	public CallResult init(Object[] args) {
 		
-		Util.seq(Level.verbose, Side.PX, Util.Direction.NONE, "init");
+		Util.seq(Level.debug, Side.PX, Util.Direction.NONE, "enter init");
 		
 //		listenerAddresses.put(Side.UE, (byte[])args[0]);
 //		listenerPorts.put(Side.UE, (Integer)args[1]);
 //		listenerAddresses.put(Side.SP, (byte[])args[2]);
 //		listenerPorts.put(Side.SP, (Integer)args[3]);
+		
+		Util.seq(Level.debug, Side.PX, Util.Direction.NONE, "done init");
 		
 		return new CallResult(Atom.OK, null);
 	}
@@ -85,14 +90,14 @@ public final class PxCb implements CallBack {
 			
 			InternalSipMessage ism = (InternalSipMessage)message;
 			
-			if (seen.contains(ism.digest) && System.currentTimeMillis() == 314) {
+			if (seen.contains(ism.digest) && Main.NEVER) {
 				// ignore this resend
 				// Util.trace(Level.verbose, "PX ------------- ignore resend from %s: %d", ism.side.toString(), ism.digest.intValue());
 				return new CallResult(Atom.NOREPLY);
 			}
 			else {
 				
-				if (System.currentTimeMillis() == 314) {
+				if (Main.NEVER) {
 					seen.add(ism.digest);
 				}
 			
@@ -102,19 +107,8 @@ public final class PxCb implements CallBack {
 				
 					final Side side = ism.side;
 					final Side otherSide = otherSide(side);
-			
-//					Util.trace(
-//							Level.verbose,
-//							"PX received from %s [%d]:%n%s",
-//							ism.side.toString(),
-//							ism.digest.intValue(),
-//							sm.toString());
-					
-					//Util.seq(Level.verbose, Side.PX, direction(side, otherSide), sm.firstLine);
 
-					
-
-					if (isRequest(sm)) {
+					if (sm.isRequest()) {
 					
 						// modify before passing on
 					
@@ -149,10 +143,44 @@ public final class PxCb implements CallBack {
 										);
 
 						prepend(newVia, vv);
+						
+						if (sm.isRegisterRequest()) {
+							
+							final String user = sm.getUser();
+							
+							final InetAddress ia = InetAddress.getByAddress(ism.sourceAddr);
+							final SocketAddress sa = new InetSocketAddress(ia, ism.sourcePort.intValue());
+							
+							Util.seq(Level.debug, Side.PX, Direction.NONE,
+									String.format("registering: %s -> %s", user, sa.toString()));
+							registry.put(user, sa);
+							
+						}
+						
+						if (otherSide == Side.UE) {
+							// terminating INVITE e.g.
+							
+							final String user = sm.getUser();
+							
+							final SocketAddress sa = registry.get(user);
+							if (sa == null) {
+								throw new RuntimeException();
+							}
+							else {
+								final byte[] addr = ((InetSocketAddress)sa).getAddress().getAddress();
+								final Integer port =  Integer.valueOf(((InetSocketAddress)sa).getPort());
+								
+								final GenServer gsForward = portSenders.get(otherSide);
+								gsForward.cast(ism.setDestination(addr, port));
+							}
+						}
+						else {
+							final GenServer gsForward = portSenders.get(otherSide);
+							gsForward.cast(ism);
+						}
 
-						//Util.trace(Level.verbose, "proxy casting, count: %d", castCount);
-						final GenServer gsForward = portSenders.get(otherSide);
-						gsForward.cast(ism);
+
+
 					}
 					else if (isResponse(sm)) {
 						// a response .. easy, just drop topmost via and use new top via as destination
@@ -177,22 +205,11 @@ public final class PxCb implements CallBack {
 						String destAddr = addrPortParts[0];
 						String destPort = addrPortParts.length > 1 ? addrPortParts[1] : "5060";
 
-						final GenServer transientSender =
-								GenServer.start(
-										new RespSenderCb(otherSide),
-										new Object[]{},
-										String.format("tr-sender-%d", trCount++));
-
-						InternalSipMessage newIsm = new InternalSipMessage(
-								ism.side,
-								ism.message,
-								Integer.valueOf(0),
-								toByteArray(destAddr),
-								Integer.valueOf(Integer.parseInt(destPort)));
-						
-						
-						
-						transientSender.cast(newIsm);
+						final GenServer gsForward = portSenders.get(otherSide);
+						gsForward.cast(
+								new InternalSipMessage(
+										ism.side, ism.message, Integer.valueOf(0), toByteArray(destAddr),
+										Integer.valueOf(Integer.parseInt(destPort))));
 					}
 					else {
 						throw new RuntimeException("neither request nor response");
@@ -200,7 +217,6 @@ public final class PxCb implements CallBack {
 				}
 				catch (Exception e) {
 					e.printStackTrace();
-					System.exit(1);
 				}
 			}
 			return new CallResult(Atom.NOREPLY);
@@ -239,12 +255,6 @@ public final class PxCb implements CallBack {
 
 	private Side otherSide(Side side) {
 		return side == Side.UE ? Side.SP : Side.UE;
-	}
-
-	private boolean isRequest(SipMessage sm) {
-		//Util.trace(Level.verbose, "+++ message first line: %s", sm.firstLine);
-		//Util.trace(Level.verbose, "+++ ends SIP/2.0? %b", sm.firstLine.endsWith("SIP/2.0"));
-		return sm.firstLine.endsWith("SIP/2.0");
 	}
 
 	private boolean isResponse(SipMessage sm) {
