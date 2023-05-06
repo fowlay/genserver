@@ -8,6 +8,16 @@ import java.util.ArrayList;
 
 
 public class SipMessage {
+
+	public enum Method {
+		REGISTER,
+		INVITE,
+		ACK,
+		BYE,
+		CANCEL,
+		SUBSCRIBE,
+		NOTIFY
+	}
 	
 	final TYPE type;
 	
@@ -151,7 +161,7 @@ public class SipMessage {
 	}
 
 	public boolean isRegisterRequest() {
-		return isRequest() && firstLine.startsWith("REGISTER ");
+		return isRequest() && getMethod() == Method.REGISTER;
 	}
 	
 
@@ -175,6 +185,33 @@ public class SipMessage {
 		}
 		else {
 			return toHeaderFields;
+		}
+	}
+
+	private Method getMethod() {
+		if (isRequest()) {
+			final int firstSpacePos = firstLine.indexOf(' ');
+			final String firstWord = firstLine.substring(0, firstSpacePos);
+			for (Method m : Method.values()) {
+				if (m.toString().equals(firstWord)) {
+					return m;
+				}
+			}
+			throw new RuntimeException();
+		}
+		else if (isResponse()) {
+			final List<String> hh = getHeaderFields("CSeq");
+			final String[] words = hh.get(0).split(" ");
+			final String word = words[words.length - 1];
+			for (Method m : Method.values()) {
+				if (m.toString().equals(word)) {
+					return m;
+				}
+			}
+			throw new RuntimeException();
+		}
+		else {
+			throw new RuntimeException();
 		}
 	}
 }

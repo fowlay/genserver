@@ -15,7 +15,7 @@ public final class Main {
 	public static final boolean NEVER = System.currentTimeMillis() == 314;
 	
 	public static final int[] localIpAddress = new int[]{10, 0, 0, 17};
-	// public static final int[] localIpAddress = new int[]{10, 10, 69, 179};
+	//public static final int[] localIpAddress = new int[]{10, 10, 69, 179};
 	
 	public static final byte[] sipAddrUe = Util.toByteArray(localIpAddress);
 	public static final Integer sipPortUe = Integer.valueOf(9060);

@@ -17,17 +17,16 @@ import st.foglo.stateless_proxy.Util.Direction;
 import st.foglo.stateless_proxy.Util.Level;
 
 public final class AccessUdpCb extends UdpCb {
-	
+
 	final byte[] localAddr;
 	final int localPort;
-	
 
 	public AccessUdpCb(Side side, GenServer proxy, byte[] localAddr, int localPort) {
 		super(side, proxy);
 		this.localAddr = localAddr;
 		this.localPort = localPort;
 	}
-	
+
 	/////////////////////////////////////////////////
 
 	@Override
@@ -36,8 +35,7 @@ public final class AccessUdpCb extends UdpCb {
 		Util.seq(Level.debug, side, Direction.NONE, "enter init");
 
 		try {
-			final SocketAddress sa =
-					new InetSocketAddress(InetAddress.getByAddress(localAddr), localPort);
+			final SocketAddress sa = UdpCb.createSocketAddress(localAddr, localPort);
 			socket = new DatagramSocket(sa);
 
 			socket.setSoTimeout(Main.SO_TIMEOUT);
@@ -47,7 +45,7 @@ public final class AccessUdpCb extends UdpCb {
 		} catch (UnknownHostException e) {
 			e.printStackTrace();
 			return new CallResult(Atom.IGNORE);
-			
+
 		} catch (SocketException e) {
 			e.printStackTrace();
 			return new CallResult(Atom.IGNORE);
@@ -61,52 +59,48 @@ public final class AccessUdpCb extends UdpCb {
 			// consider dropping! The right thing to do since there may be multiple UEs
 			Util.seq(Level.verbose, side, Direction.NONE, "dropping keepAlive");
 			return new CallResult(Atom.OK, CallResult.TIMEOUT_ZERO);
-		}
-		else if (mb instanceof InternalSipMessage) {
-			
-			// The ism has the required remote addressing; same handling for request and response
+		} else if (mb instanceof InternalSipMessage) {
+
+			// The ism has the required remote addressing; same handling for request and
+			// response
 
 			final InternalSipMessage ism = (InternalSipMessage) message;
 			final SipMessage sm = ism.message;
-			
+
 			if (ism.message.isRequest()) {
 				Util.seq(Level.verbose, side, Direction.OUT, sm.firstLine);
-			}
-			else if (ism.message.isResponse()) {
+			} else if (ism.message.isResponse()) {
 				Util.seq(Level.verbose, side, Direction.OUT, sm.firstLine);
 			}
-			
-			
+
 			try {
-				
-				final InetAddress ia = InetAddress.getByAddress(ism.destAddr);
-				final SocketAddress sa = new InetSocketAddress(ia, ism.destPort.intValue());
+				final SocketAddress sa = UdpCb.createSocketAddress(ism.destAddr, ism.destPort.intValue());
+
 				socket.connect(sa);
-				
+
 				final byte[] ba = Util.toByteArray(ism.message);
-				
+
 				final DatagramPacket p = new DatagramPacket(ba, ba.length);
-				
+
 				try {
 					socket.send(p);
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
-				
+
 				socket.disconnect();
-				
+
 				return new CallResult(Atom.OK, CallResult.TIMEOUT_ZERO);
-				
+
 			} catch (SocketException e) {
 				e.printStackTrace();
 				return new CallResult(Atom.IGNORE);
-				
+
 			} catch (UnknownHostException e) {
 				e.printStackTrace();
 				return new CallResult(Atom.IGNORE);
 			}
-			
-			
+
 		}
 
 		else {
@@ -120,8 +114,8 @@ public final class AccessUdpCb extends UdpCb {
 		byte[] buffer = new byte[Main.DATAGRAM_MAX_SIZE];
 		DatagramPacket p = new DatagramPacket(buffer, buffer.length);
 		try {
-//			Util.seq(Level.debug, side, Util.Direction.NONE,
-//					String.format("start listening, port: %d", socket.getLocalPort()));
+			// Util.seq(Level.debug, side, Util.Direction.NONE,
+			// String.format("start listening, port: %d", socket.getLocalPort()));
 
 			socket.receive(p);
 			final int recLength = p.getLength();
@@ -130,35 +124,30 @@ public final class AccessUdpCb extends UdpCb {
 				final KeepAliveMessage kam = new KeepAliveMessage(side, buffer, recLength);
 				Util.seq(Level.verbose, side, Direction.IN, kam.toString());
 				proxy.cast(kam);
-			}
-			else {
+			} else {
 				StringBuilder sb = new StringBuilder();
 				for (int j = 0; j < recLength; j++) {
 					sb.append((char) buffer[j]);
 				}
 
-				final SipMessage sipMessage =
-						new SipMessage(buffer, recLength);
-				
+				final SipMessage sipMessage = new SipMessage(buffer, recLength);
+
 				final byte[] sourceAddr = p.getAddress().getAddress();
 				final Integer sourcePort = Integer.valueOf(p.getPort());
-				
-				final InternalSipMessage iMsg =
-						new InternalSipMessage(
-								side,
-								sipMessage,
-								Util.digest(buffer, recLength),
-								null,
-								null,
-								sourceAddr,
-								sourcePort);
+
+				final InternalSipMessage iMsg = new InternalSipMessage(
+						side,
+						sipMessage,
+						Util.digest(buffer, recLength),
+						null,
+						null,
+						sourceAddr,
+						sourcePort);
 				Util.seq(Level.verbose, side, Direction.IN, sipMessage.firstLine);
 				proxy.cast(iMsg);
 			}
-		}
-		catch (SocketTimeoutException ignoreException) {
-		}
-		catch (Exception e) {
+		} catch (SocketTimeoutException ignoreException) {
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		return result;

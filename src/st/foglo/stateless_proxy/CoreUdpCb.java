@@ -3,8 +3,6 @@ package st.foglo.stateless_proxy;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
@@ -24,7 +22,6 @@ public class CoreUdpCb extends UdpCb {
 		this.outgoingProxyPort = outgoingProxyPort.intValue();
 	}
 	
-
 	@Override
 	public CallResult init(Object[] ignored) {
 		
@@ -34,8 +31,10 @@ public class CoreUdpCb extends UdpCb {
 			socket = new DatagramSocket();
 			socket.setSoTimeout(Main.SO_TIMEOUT);
 			
-			final InetAddress ia = InetAddress.getByAddress(outgoingProxyAddr);
-			final SocketAddress sa = new InetSocketAddress(ia, outgoingProxyPort);
+
+
+			final SocketAddress sa = UdpCb.createSocketAddress(outgoingProxyAddr, outgoingProxyPort);
+
 			socket.connect(sa);
 			
 			Util.seq(Level.debug, side, Direction.NONE, "done init");

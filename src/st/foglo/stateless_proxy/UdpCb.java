@@ -1,6 +1,10 @@
 package st.foglo.stateless_proxy;
 
 import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.net.UnknownHostException;
 
 import st.foglo.genserver.Atom;
 import st.foglo.genserver.CallBack;
@@ -52,7 +56,8 @@ public abstract class UdpCb implements CallBack {
 	public void handleTerminate() {
 		socket.close();
 	}
-	
-	
 
+    public static SocketAddress createSocketAddress(byte[] addr, int port) throws UnknownHostException {
+		return new InetSocketAddress(InetAddress.getByAddress(addr), port);
+    }
 }

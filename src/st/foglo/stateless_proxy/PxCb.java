@@ -1,6 +1,5 @@
 package st.foglo.stateless_proxy;
 
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 
@@ -147,12 +146,13 @@ public final class PxCb implements CallBack {
 						if (sm.isRegisterRequest()) {
 							
 							final String user = sm.getUser();
-							
-							final InetAddress ia = InetAddress.getByAddress(ism.sourceAddr);
-							final SocketAddress sa = new InetSocketAddress(ia, ism.sourcePort.intValue());
-							
+		
+							final SocketAddress sa = UdpCb.createSocketAddress(ism.sourceAddr,
+									ism.sourcePort.intValue());
+
 							Util.seq(Level.debug, Side.PX, Direction.NONE,
 									String.format("registering: %s -> %s", user, sa.toString()));
+
 							registry.put(user, sa);
 							
 						}
@@ -169,7 +169,6 @@ public final class PxCb implements CallBack {
 							else {
 								final byte[] addr = ((InetSocketAddress)sa).getAddress().getAddress();
 								final Integer port =  Integer.valueOf(((InetSocketAddress)sa).getPort());
-								
 								final GenServer gsForward = portSenders.get(otherSide);
 								gsForward.cast(ism.setDestination(addr, port));
 							}
