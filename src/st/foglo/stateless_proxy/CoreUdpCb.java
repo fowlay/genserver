@@ -83,7 +83,7 @@ public class CoreUdpCb extends UdpCb {
 			// if the message comes with destination info, then use it,
 			// else use outbound proxy
 		
-			final byte[] ba = Util.toByteArray(ism.message);
+			final byte[] ba = ism.message.toByteArray();
 			
 			try {
 				final DatagramPacket p = new DatagramPacket(ba, ba.length);

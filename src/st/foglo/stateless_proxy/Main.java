@@ -1,6 +1,9 @@
 package st.foglo.stateless_proxy;
 
+import java.time.LocalDateTime;
+
 import st.foglo.genserver.GenServer;
+import st.foglo.stateless_proxy.Util.Level;
 
 public final class Main {
 	
@@ -13,6 +16,9 @@ public final class Main {
 	public static final int DATAGRAM_MAX_SIZE = 3000;
 	
 	public static final boolean NEVER = System.currentTimeMillis() == 314;
+	public static final boolean ALWAYS = !NEVER;
+
+	public static final boolean RECORD_ROUTE = ALWAYS;
 	
 	public static final int[] localIpAddress = new int[]{10, 0, 0, 17};
 	//public static final int[] localIpAddress = new int[]{10, 10, 69, 179};
@@ -36,6 +42,12 @@ public final class Main {
 	public static void main(String[] args) {
 
 		// Create proxy
+
+		final String ldt = LocalDateTime.now().toString();
+
+		Util.trace(Level.verbose, "ldt string: %s", ldt);
+
+		Util.trace(Level.verbose, "refined string: %s", Util.ldt());
 
 		final GenServer px = GenServer.start(
 				new PxCb(sipAddrUe, sipPortUe, sipAddrSp, sipPortSp),

@@ -1,10 +1,11 @@
 package st.foglo.stateless_proxy;
 
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Map.Entry;
+
 import java.util.List;
-import java.util.ArrayList;
 
 
 public class SipMessage {
@@ -31,7 +32,7 @@ public class SipMessage {
 	 * 
 	 * Values are lists of as-received strings, no CR LF at end
 	 */
-	final Map<String, List<String>> headers = new HashMap<String, List<String>>();
+	private final Map<String, List<String>> headers = new HashMap<String, List<String>>();
 	
 	/**
 	 * One long string, with embedded CR LF sequences
@@ -122,24 +123,18 @@ public class SipMessage {
 		String key = headerLine.substring(0, indexColon);
 		
 		if (headers.get(key) == null) {
-			List<String> hh = new ArrayList<String>();
-			hh.add(headerLine);
+			List<String> hh = new LinkedList<String>();
+			hh.add(headerLine.substring(1+indexColon).trim());
 			headers.put(key, hh);
+			//Util.trace(Level.verbose, "+++ %s -> %s", key, headerLine);
 		}
 		else {
 			List<String> hh = headers.get(key);
-			hh.add(headerLine);
+			hh.add(headerLine.substring(1+indexColon).trim());
+			//Util.trace(Level.verbose, "+++ %s -> %s", key, headerLine);
 		}
 	}
-	
-	public boolean isRequest() {
-		return firstLine.endsWith("SIP/2.0");
-	}
-	
-	public boolean isResponse() {
-		return firstLine.startsWith("SIP/2.0");
-	}
-	
+
 	public String toString() {
 		final byte[] crLf = new byte[]{13, 10};
 		final StringBuilder sb = new StringBuilder();
@@ -147,8 +142,11 @@ public class SipMessage {
 		sb.append(Character.valueOf((char) crLf[1]));
 		
 		for (Entry<String, List<String>> me : headers.entrySet()) {
-			List<String> hh = me.getValue();
+			final List<String> hh = me.getValue();
+			final String key = me.getKey();
 			for (String s : hh) {
+				sb.append(key);
+				sb.append(": ");
 				sb.append(s);
 				sb.append(Character.valueOf((char) crLf[1]));
 			}
@@ -160,36 +158,47 @@ public class SipMessage {
 		return new String(sb);
 	}
 
-	public boolean isRegisterRequest() {
-		return isRequest() && getMethod() == Method.REGISTER;
-	}
-	
-
 	public String getUser() {
 
-		final List<String> toHeaders = getHeaderFields("To");
+		final String toHeader = getTopHeaderField("To");
 		
-		final int posSip = toHeaders.get(0).indexOf("sip:");
-		final int posAtSign = toHeaders.get(0).indexOf('@');
+		final int posSip = toHeader.indexOf("sip:");
+		final int posAtSign = toHeader.indexOf('@');
 		
-		return toHeaders.get(0).substring(posSip+4, posAtSign);
+		return toHeader.substring(posSip+4, posAtSign);
 	}
 	
 	
 
 
-	private List<String> getHeaderFields(String key) {
-		final List<String> toHeaderFields = headers.get("To");
+	public List<String> getHeaderFields(String key) {
+		final List<String> toHeaderFields = headers.get(key);
 		if (toHeaderFields == null) {
-			throw new RuntimeException();
+			return new LinkedList<String>();
 		}
 		else {
 			return toHeaderFields;
 		}
 	}
 
-	private Method getMethod() {
-		if (isRequest()) {
+
+	/**
+	 * 
+	 * @param key A key such as "Route"
+	 * @return The topmost header field value
+	 */
+	public String getTopHeaderField(String key) {
+		final List<String> fields = getHeaderFields(key);
+		if (fields.isEmpty()) {
+			return null;
+		}
+		else {
+			return fields.get(0);
+		}
+	}
+
+	public Method getMethod() {
+		if (type == TYPE.request) {
 			final int firstSpacePos = firstLine.indexOf(' ');
 			final String firstWord = firstLine.substring(0, firstSpacePos);
 			for (Method m : Method.values()) {
@@ -199,7 +208,7 @@ public class SipMessage {
 			}
 			throw new RuntimeException();
 		}
-		else if (isResponse()) {
+		else if (type == TYPE.response) {
 			final List<String> hh = getHeaderFields("CSeq");
 			final String[] words = hh.get(0).split(" ");
 			final String word = words[words.length - 1];
@@ -214,4 +223,82 @@ public class SipMessage {
 			throw new RuntimeException();
 		}
 	}
+
+
+	public void prepend(String key, String headerFieldValue) {
+		List<String> headerFields = getHeaderFields(key);
+		((LinkedList<String>)headerFields).addFirst(headerFieldValue);
+	}
+
+	public void dropFirst(String key) {
+		final List<String> hh = getHeaderFields(key);
+		((LinkedList<String>)hh).removeFirst();
+		if (hh.isEmpty()) {
+			headers.remove(key);
+		}
+		else {
+			setHeaderFields(key, hh);
+		}
+	}
+
+	/**
+	 * @param key
+	 * @param headerFields
+	 */
+	public void setHeaderFields(String key, List<String> headerFields) {
+		headers.put(key, headerFields);
+	}
+
+	public void setHeaderField(String key, String headerField) {
+		final List<String> headerFields = new LinkedList<String>();
+		headerFields.add(headerField);
+		setHeaderFields(key, headerFields);
+	}
+
+
+	public byte[] toByteArray() {
+		
+		byte[] ba = new byte[10000];   // TOXDO, ugly
+		int k = 0;
+		
+		for (byte b : firstLine.getBytes()) {
+			ba[k++] = b;
+		}
+		ba[k++] = 13;
+		ba[k++] = 10;
+
+		for (Map.Entry<String, List<String>> e : headers.entrySet()) {
+			final String key = e.getKey();
+			for (String h : e.getValue()) {
+				for (byte b : key.getBytes()) {
+					ba[k++] = b;
+				}
+				ba[k++] = ':';
+				ba[k++] = ' ';
+				for (byte b : h.getBytes()) {
+					ba[k++] = b;
+				}
+				ba[k++] = 13;
+				ba[k++] = 10;
+			}
+		}
+
+		if (body != null) {
+			ba[k++] = 13;
+			ba[k++] = 10;
+			
+			for (byte b : body.getBytes()) {
+				ba[k++] = b;
+			}
+		}
+		
+		byte[] result = new byte[k];
+		
+		for (int j = 0; j < k; j++) {
+			result[j] = ba[j];
+		}
+		
+		return result;
+	}
+
 }

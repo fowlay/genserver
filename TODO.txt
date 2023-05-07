@@ -60,24 +60,30 @@ easily.
 
 ------------------------------------
 
+DONE: Refactoring: Use LinkedList for holding multiple header fields.
+
+-----------------------------------------------
+
+DONE: Add record-routing. This is done in an asymmetric manner: The UE
+wants a route set that includes the proxy, but the SP side does NOT
+want it - the SP side will always talk to the proxy by default.
+
+----------------------------------------
+
+DONE: Test with MicroSIP running on different host. This works; the
+settings of MS firewalls may have to be considered.
+
+-------------------------------------
+
+Refactoring: It is pointless to use List<String> as a type for
+multiple header fields, instead use LinkedList<String> everywhere.
+
+-----------------------------------------
+
 Registry correction: The registry should be updated only on a 2xx
 REGISTER response.
 
 On de-REGISTER, clear the registry entry.
-
------------------------------------------------
-
-The proxy is not record-routing. Therefore some messaging will take
-the shortest path, bypassing the proxy. This happens e.g. when the
-MicroSIP client sends BYE. The messaging can be seen in Wireshark.
-
-Record-routing needs another listening-only process. It can use a
-dynamically assigned local port. The proxy can query what port this
-is, and use it when constructing the Record-Route header field.
-
-When the proxy handles a message that was picked up by the listening
-process, extract the To: user part and see if it is a registry key. If
-so, forward to UE, else forward to SP.
 
 -------------------------------------
 
@@ -101,8 +107,8 @@ like orderly shutdown.
 
 ----------------------------------------
 
-To be tested: MicroSIP running on different host. LinkSYS telephone
-configured towards the proxy. Do record-routing before testing this.
+Test with Linksys telephone. Be careful about reconfiguring, backup on
+paper.
 
 ----------------------------------------
 
@@ -145,4 +151,3 @@ exception in case of bad shape.
 Implementation of GenServer "call": Is there a complication when
 several calls are executed in sequence and corresponding results are
 to be collected? Maybe not? Or?
-

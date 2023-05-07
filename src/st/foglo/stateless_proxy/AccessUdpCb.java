@@ -3,8 +3,6 @@ package st.foglo.stateless_proxy;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
@@ -13,6 +11,7 @@ import java.net.UnknownHostException;
 import st.foglo.genserver.Atom;
 import st.foglo.genserver.CallResult;
 import st.foglo.genserver.GenServer;
+import st.foglo.stateless_proxy.SipMessage.TYPE;
 import st.foglo.stateless_proxy.Util.Direction;
 import st.foglo.stateless_proxy.Util.Level;
 
@@ -67,18 +66,20 @@ public final class AccessUdpCb extends UdpCb {
 			final InternalSipMessage ism = (InternalSipMessage) message;
 			final SipMessage sm = ism.message;
 
-			if (ism.message.isRequest()) {
+			if (ism.message.type == TYPE.request) {
 				Util.seq(Level.verbose, side, Direction.OUT, sm.firstLine);
-			} else if (ism.message.isResponse()) {
+			} else if (ism.message.type == TYPE.response) {
 				Util.seq(Level.verbose, side, Direction.OUT, sm.firstLine);
 			}
 
 			try {
 				final SocketAddress sa = UdpCb.createSocketAddress(ism.destAddr, ism.destPort.intValue());
 
+				//Util.trace(Level.verbose, "just created sa: %s", sa.toString());
+
 				socket.connect(sa);
 
-				final byte[] ba = Util.toByteArray(ism.message);
+				final byte[] ba = ism.message.toByteArray();
 
 				final DatagramPacket p = new DatagramPacket(ba, ba.length);
 

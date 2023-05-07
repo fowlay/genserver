@@ -3,7 +3,7 @@ package st.foglo.stateless_proxy;
 public final class InternalSipMessage extends MsgBase {
 	
 
-	final Side side;            // the side where this message entered the proxy
+	public final Side side;            // the side where this message entered the proxy
 	final SipMessage message;
 	
 	final byte[] destAddr;

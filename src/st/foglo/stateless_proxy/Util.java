@@ -1,8 +1,6 @@
 package st.foglo.stateless_proxy;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
 
 public final class Util {
 	
@@ -124,50 +122,6 @@ public final class Util {
 		display(level, String.format("%s%s %s", whiteSpace, arrow, text));
 	}
 
-	public static byte[] toByteArray(SipMessage message) {
-		
-		byte[] ba = new byte[10000];   // TODO, ugly
-		int k = 0;
-		
-		String firstLine = message.firstLine;
-		
-		for (byte b : firstLine.getBytes()) {
-			ba[k++] = b;
-		}
-		ba[k++] = 13;
-		ba[k++] = 10;
-		
-		
-		Map<String, List<String>> hh  = message.headers;
-		
-		for (List<String> ss : hh.values()) {
-			for (String s : ss) {
-				for (byte b : s.getBytes()) {
-					ba[k++] = b;
-				}
-				ba[k++] = 13;
-				ba[k++] = 10;
-			}
-		}
-	
-		if (message.body != null) {
-			ba[k++] = 13;
-			ba[k++] = 10;
-			
-			for (byte b : message.body.getBytes()) {
-				ba[k++] = b;
-			}
-		}
-		
-		byte[] result = new byte[k];
-		
-		for (int j = 0; j < k; j++) {
-			result[j] = ba[j];
-		}
-		
-		return result;
-	}
-	
 	public static Integer digest(byte[] buffer, int recLength) {
 		int sum = 0;
 		for (int i = 0; i < recLength; i++) {
@@ -177,8 +131,15 @@ public final class Util {
 	}
 	
 	public static String ldt() {
-		final LocalDateTime ldt = LocalDateTime.now();
-		return String.format("%s %s", ldt.toString().substring(0, 10), ldt.toString().substring(11, 11+12));
+		final String ldt = LocalDateTime.now().toString();
+		final String date = ldt.substring(0, 10);
+		final String time = ldt.substring(11);
+		if (time.length() > 12) {
+			return String.format("%s %s", date, time.substring(0, 12));
+		}
+		else {
+			return String.format("%s %s", date, time);
+		}
 	}
 	
 
