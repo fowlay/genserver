@@ -4,4 +4,12 @@
     "java.project.referencedLibraries": [
         "lib/**/*.jar"
     ]
+
+
+
+
+    "files.trimTrailingWhitespace": true,
+    "editor.bracketPairColorization.enabled": false,
+    "files.insertFinalNewline": true,
+    
 }

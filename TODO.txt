@@ -68,6 +68,8 @@ DONE: Add record-routing. This is done in an asymmetric manner: The UE
 wants a route set that includes the proxy, but the SP side does NOT
 want it - the SP side will always talk to the proxy by default.
 
+RFC 5658 discusses this and related strategies
+
 ----------------------------------------
 
 DONE: Test with MicroSIP running on different host. This works; the
@@ -75,35 +77,100 @@ settings of MS firewalls may have to be considered.
 
 -------------------------------------
 
-Refactoring: It is pointless to use List<String> as a type for
+DONE: Refactoring: It is pointless to use List<String> as a type for
 multiple header fields, instead use LinkedList<String> everywhere.
 
 -----------------------------------------
 
+DONE: Switch to java.nio, where a UDP listening operation can be
+interrupted by another thread; no need for looping on a socket timeout
+when there is no traffic.
+
+---------------------------------------
+
+DONE: After unification of the sender/listener functions, consider
+using interruptions instead of timeout when a cast or call is to be
+handled and the genserver thread is waiting for UDP input.
+
+Using timeouts with the java.net implementation, the timeout has to
+be fairly short (like 100 ms), or there will be resends.
+
+----------------------------------
+
+DONE: walk through the classes and use the new "Modes" scheme
+
+Tracing/logging: The message level concept is not so helpful. Instead
+declare TRACE_MODES globally as an array of keywords. Each trace call
+can then refer to one of the keywords.
+
+------------------------------------------
+
+DONE: ByteBuffer handling: Usage is single-threaded. Start all usage,
+in UdpCb, by resetting the buffer; don't do cleanup.
+
+-------------------------------------------
+
+DONE: Tracing of k-a-m messages: Make this its own trace category.
+
+------------------------------------------
+
+DONE: Handling of k-a-m messages: Move the drop decision to the proxy.
+
+-----------------------------------------
+
+DONE: GenServer: Protect the running thread against execptions when
+doing callbacks.
+
+-----------------------------------------
+
+Add an Info class that can summarize counters and such, with a telnet
+server operator interface (supporting one operator at a time).
+
+------------------------------------------
+GenServer: Coding mistake to fix, methods like GenServer.cast should
+not pass the GenServer instance as argument
+
+-----------------------------------------
+
+Remove the Interrupter class. Or keep it, as configurable option?
+
+------------------------------------------
+
+GenServer: Has the concept been implemented already?
+
+----------------------------------
+
+GenServer: The package must not have external dependencies.
+
+-------------------------------------------
+
+GenServer: Make the "interrupt" action a specifically enabled feature.
+
+------------------------------------------
+
+Clear out the java.net based implementation
+
+---------------------------------------------
+
 Registry correction: The registry should be updated only on a 2xx
 REGISTER response.
 
-On de-REGISTER, clear the registry entry.
+On de-REGISTER, clear the registry entry (expensive).
 
 -------------------------------------
 
 Refactoring: Consider pulling the Atom enum into GenServer. Maybe
 revise the naming .. use "status" for ok/reply/noreply/stop?
 
----------------------------------------
-
-After unification of the sender/listener functions, consider using
-interruptions instead of timeout when a cast or call is to be handled
-and the genserver thread is waiting for UDP input.
-
-Currently, using timeouts, the timeout has to be fairly short (like
-100 ms), or there will be resends.
-
 ----------------------------------------
 
-A supervisor process could be introduced in Main. But what would the
-value be? It could listen to a configured port for control purposes,
-like orderly shutdown.
+A supervisor process should be introduced.
+
+The synchronized startup sequence can be
+
+Start supervisor, supervisor init: start the proxy, start the SP
+listener with reference to proxy, SP listener init registers itself
+with proxy, start UE listener similarly.
 
 ----------------------------------------
 
@@ -133,7 +200,7 @@ Make the CallBackResult data type specific to the callback:
 A base class can be introduced. Make all of this be inner classes in
 GenServer?
 
-----------------------------------
+------------------------------------
 
 GenServer: Process registry: A static HashMap (ConcurrentHashMap?) in
 GenServer. A "name" variety of the GenServer.start method. The names
@@ -151,3 +218,17 @@ exception in case of bad shape.
 Implementation of GenServer "call": Is there a complication when
 several calls are executed in sequence and corresponding results are
 to be collected? Maybe not? Or?
+
+-----------------------------------------
+
+Tracing SIP responses: Maybe just show code and CSeq method?
+
+-----------------------------------------
+
+Tracing SIP requests: Maybe drop the SIP/2.0 part?
+
+-----------------------------------------
+
+Is there a need for trace calls that specify more than one trace mode?
+
+-----------------------------------------

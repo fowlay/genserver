@@ -4,7 +4,6 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.HashMap;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import st.foglo.genserver.CallBack;
 import st.foglo.genserver.CallResult;
@@ -13,6 +12,7 @@ import st.foglo.stateless_proxy.SipMessage.Method;
 import st.foglo.stateless_proxy.SipMessage.TYPE;
 import st.foglo.stateless_proxy.Util.Direction;
 import st.foglo.stateless_proxy.Util.Level;
+import st.foglo.stateless_proxy.Util.Mode;
 import st.foglo.genserver.Atom;
 
 /**
@@ -40,14 +40,14 @@ public final class PxCb implements CallBack {
 	@Override
 	public CallResult init(Object[] args) {
 
-		Util.seq(Level.debug, Side.PX, Util.Direction.NONE, "enter init");
+		Util.seq(Mode.START, Side.PX, Util.Direction.NONE, "enter init");
 
 		// listenerAddresses.put(Side.UE, (byte[])args[0]);
 		// listenerPorts.put(Side.UE, (Integer)args[1]);
 		// listenerAddresses.put(Side.SP, (byte[])args[2]);
 		// listenerPorts.put(Side.SP, (Integer)args[3]);
 
-		Util.seq(Level.debug, Side.PX, Util.Direction.NONE, "done init");
+		Util.seq(Mode.START, Side.PX, Util.Direction.NONE, "done init");
 
 		return new CallResult(Atom.OK, null);
 	}
@@ -58,7 +58,7 @@ public final class PxCb implements CallBack {
 		MsgBase mb = (MsgBase) message;
 		if (mb instanceof PortSendersMsg) {
 
-			Util.seq(Level.verbose, Side.PX, Util.Direction.NONE, "tell proxy about port senders");
+			Util.seq(Mode.START, Side.PX, Util.Direction.NONE, "proxy getting port processes");
 
 			PortSendersMsg plm = (PortSendersMsg) mb;
 
@@ -69,15 +69,21 @@ public final class PxCb implements CallBack {
 		} else if (mb instanceof KeepAliveMessage) {
 			final KeepAliveMessage kam = (KeepAliveMessage) message;
 			final Side side = kam.side;
-			final Side otherSide = otherSide(side);
-			// Util.trace(Level.verbose, "PX received k-a-m, %s -> %s", side.toString(),
-			// otherSide.toString());
 
-			Util.seq(Level.verbose, Side.PX, direction(side, otherSide), "k-a-m");
 
-			GenServer gsForward = portSenders.get(otherSide);
-			gsForward.cast(kam);
+            if (side == Side.SP) {
+                Util.seq(Mode.KEEP_ALIVE, Side.PX, Util.Direction.NONE, "drop keep-alive response");
+            }
+            else {
+                final Side otherSide = otherSide(side);
+                Util.seq(Mode.KEEP_ALIVE, Side.PX, direction(side, otherSide), mb.toString());
+                GenServer gsForward = portSenders.get(otherSide);
+                gsForward.cast(gsForward, kam);
+                return new CallResult(Atom.NOREPLY);
+            }
+
 			return new CallResult(Atom.NOREPLY);
+
 		} else if (mb instanceof InternalSipMessage) {
 
 			InternalSipMessage ism = (InternalSipMessage) message;
@@ -91,7 +97,7 @@ public final class PxCb implements CallBack {
 
 				if (sm.type == TYPE.request) {
 
-					Util.seq(Level.verbose, Side.PX, direction(side, otherSide), sm.firstLine);
+					Util.seq(Mode.SIP, Side.PX, direction(side, otherSide), sm.firstLine);
 
 					// Max-Forwards
 					final String mf = sm.getTopHeaderField("Max-Forwards");
@@ -108,8 +114,8 @@ public final class PxCb implements CallBack {
 						}
 					}
 					final byte[] listenerAddress = listenerAddresses.get(otherSide);
-					final Integer localPort = (Integer) portSenders.get(otherSide(ism.side))
-							.call(new GetLocalPortMsg());
+					final Integer localPort = listenerPorts.get(otherSide);
+
 					final String newVia = String.format("SIP/2.0/UDP %s:%s;rport;branch=%s",
 							toDottedAddress(listenerAddress),
 							localPort.intValue(),
@@ -133,7 +139,7 @@ public final class PxCb implements CallBack {
 							method == Method.BYE ||
 							method == Method.INVITE ||
 							method == Method.SUBSCRIBE) {
-						final List<String> hh = sm.getHeaderFields("Route");
+						final LinkedList<String> hh = sm.getHeaderFields("Route");
 						if (!hh.isEmpty()) {
 							final String topRoute = hh.get(0);
 							final int indexOfSipColon = topRoute.indexOf("sip:");
@@ -146,28 +152,16 @@ public final class PxCb implements CallBack {
 						}
 					}
 
-
-					// Record-route insertion, never do it for originating requests
-					if (Main.NEVER && ism.side == Side.UE && (method == Method.INVITE || method == Method.SUBSCRIBE)) {
-						final List<String> hh = sm.getHeaderFields("Record-Route");
-						final String rrHeaderField = String.format("<sip:%s:%s;lr>",
-						    toDottedAddress(Main.sipAddrUe),
-							Main.sipPortUe.intValue());
-						((LinkedList<String>)hh).addFirst(rrHeaderField);
-						sm.setHeaderFields("Record-Route", hh);
-					}
-
 					// Terminating request
 					// this finalizes the route set for the UE
 					if (Main.RECORD_ROUTE && ism.side == Side.SP && (method == Method.INVITE || method == Method.SUBSCRIBE)) {
-						final List<String> hh = sm.getHeaderFields("Record-Route");
+						final LinkedList<String> hh = sm.getHeaderFields("Record-Route");
 						final String rrHeaderField = String.format("<sip:%s:%s;lr>",
 						    toDottedAddress(Main.sipAddrUe),
 							Main.sipPortUe.intValue());
 						((LinkedList<String>)hh).addFirst(rrHeaderField);
 						sm.setHeaderFields("Record-Route", hh);
 					}
-
 
 					if (otherSide == Side.UE) {
 						// terminating INVITE e.g.
@@ -181,17 +175,23 @@ public final class PxCb implements CallBack {
 							final byte[] addr = ((InetSocketAddress) sa).getAddress().getAddress();
 							final Integer port = Integer.valueOf(((InetSocketAddress) sa).getPort());
 							final GenServer gsForward = portSenders.get(otherSide);
-							gsForward.cast(ism.setDestination(addr, port));
+							gsForward.cast(gsForward, ism.setDestination(addr, port));
 						}
-					} else {
+					} else if (otherSide == Side.SP) {
+
+						// TOXDO - these items should be passed in constructor call?
+						final byte[] addr = Main.outgoingProxyAddrSp;
+						final Integer port = Main.outgoingProxyPortSp;
+
 						final GenServer gsForward = portSenders.get(otherSide);
 						//Util.trace(Level.verbose, "about to cast: %s", ism.message.toString());
-						gsForward.cast(ism);
+                        Util.seq(Mode.SIPDEBUG, side, Direction.NONE, String.format("gsForward thread name is: %s", gsForward.getThread().getName()));
+						gsForward.cast(gsForward, ism.setDestination(addr, port));
 					}
 
 				} else if (sm.type == TYPE.response) {
 					// a response .. easy, just drop topmost via and use new top via as destination
-					Util.seq(Level.verbose, Side.PX, direction(side, otherSide), sm.firstLine);
+					Util.seq(Mode.SIP, Side.PX, direction(side, otherSide), sm.firstLine);
 
 					sm.dropFirst("Via");
 					final String topVia = sm.getTopHeaderField("Via");
@@ -215,11 +215,11 @@ public final class PxCb implements CallBack {
 					// Record-route insertion, for certain responses
 					if (Main.RECORD_ROUTE && ism.side == Side.SP &&
 							(method == Method.INVITE || method == Method.SUBSCRIBE)) {
-						final List<String> hh = sm.getHeaderFields("Record-Route");
+						final LinkedList<String> hh = sm.getHeaderFields("Record-Route");
 						final String rrHeaderField = String.format("<sip:%s:%s;lr>",
 								toDottedAddress(Main.sipAddrUe),
 								Main.sipPortUe.intValue());
-						((LinkedList<String>) hh).addLast(rrHeaderField);
+						hh.addLast(rrHeaderField);
 						sm.setHeaderFields("Record-Route", hh);
 					}
 
@@ -229,14 +229,15 @@ public final class PxCb implements CallBack {
 						final String rrHeaderField = String.format("<sip:%s:%s;lr>",
 						    toDottedAddress(Main.sipAddrUe),
 							Main.sipPortUe.intValue());
-						final List<String> hh = sm.getHeaderFields("Record-Route");
-						((LinkedList<String>)hh).remove(rrHeaderField);
+						final LinkedList<String> hh = sm.getHeaderFields("Record-Route");
+						hh.remove(rrHeaderField);
 						sm.setHeaderFields("Record-Route", hh);
 					}
 
 
 					final GenServer gsForward = portSenders.get(otherSide);
 					gsForward.cast(
+                            gsForward,
 							new InternalSipMessage(
 									ism.side, ism.message, Integer.valueOf(0), toByteArray(destAddr),
 									Integer.valueOf(Integer.parseInt(destPort))));

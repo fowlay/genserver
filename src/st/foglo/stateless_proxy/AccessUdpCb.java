@@ -1,19 +1,11 @@
 package st.foglo.stateless_proxy;
 
-import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.SocketAddress;
-import java.net.SocketException;
-import java.net.SocketTimeoutException;
-import java.net.UnknownHostException;
-
 import st.foglo.genserver.Atom;
 import st.foglo.genserver.CallResult;
 import st.foglo.genserver.GenServer;
 import st.foglo.stateless_proxy.SipMessage.TYPE;
 import st.foglo.stateless_proxy.Util.Direction;
-import st.foglo.stateless_proxy.Util.Level;
+import st.foglo.stateless_proxy.Util.Mode;
 
 public final class AccessUdpCb extends UdpCb {
 
@@ -30,81 +22,40 @@ public final class AccessUdpCb extends UdpCb {
 
 	@Override
 	public CallResult init(Object[] args) {
+		Util.seq(Mode.START, side, Direction.NONE, "enter init");
 
-		Util.seq(Level.debug, side, Direction.NONE, "enter init");
+		super.init(args);
 
-		try {
-			final SocketAddress sa = UdpCb.createSocketAddress(localAddr, localPort);
-			socket = new DatagramSocket(sa);
+		channelWrapper = new ChannelWrapper(side, localAddr, localPort, null, -1);
 
-			socket.setSoTimeout(Main.SO_TIMEOUT);
-			Util.seq(Level.debug, side, Direction.NONE, "done init");
-			return new CallResult(Atom.OK, CallResult.TIMEOUT_ZERO);
-
-		} catch (UnknownHostException e) {
-			e.printStackTrace();
-			return new CallResult(Atom.IGNORE);
-
-		} catch (SocketException e) {
-			e.printStackTrace();
-			return new CallResult(Atom.IGNORE);
-		}
+		// side effect on socket
+		final CallResult result = udpInit(side, localAddr, localPort);
+		Util.seq(Mode.START, side, Direction.NONE, "done init");
+		return result;
 	}
+
+
 
 	@Override
 	public CallResult handleCast(Object message) {
+
 		MsgBase mb = (MsgBase) message;
 		if (mb instanceof KeepAliveMessage) {
-			// consider dropping! The right thing to do since there may be multiple UEs
-			Util.seq(Level.verbose, side, Direction.NONE, "dropping keepAlive");
-			return new CallResult(Atom.OK, CallResult.TIMEOUT_ZERO);
+			final CallResult result = handleKeepAliveMessage(side, (KeepAliveMessage)mb);
+			return result;
 		} else if (mb instanceof InternalSipMessage) {
-
-			// The ism has the required remote addressing; same handling for request and
-			// response
-
 			final InternalSipMessage ism = (InternalSipMessage) message;
 			final SipMessage sm = ism.message;
-
-			if (ism.message.type == TYPE.request) {
-				Util.seq(Level.verbose, side, Direction.OUT, sm.firstLine);
-			} else if (ism.message.type == TYPE.response) {
-				Util.seq(Level.verbose, side, Direction.OUT, sm.firstLine);
+			if (sm.type == TYPE.request) {
+				Util.seq(Mode.SIP, side, Direction.OUT, sm.firstLine);
+			} else if (sm.type == TYPE.response) {
+				Util.seq(Mode.SIP, side, Direction.OUT, sm.firstLine);
 			}
 
-			try {
-				final SocketAddress sa = UdpCb.createSocketAddress(ism.destAddr, ism.destPort.intValue());
-
-				//Util.trace(Level.verbose, "just created sa: %s", sa.toString());
-
-				socket.connect(sa);
-
-				final byte[] ba = ism.message.toByteArray();
-
-				final DatagramPacket p = new DatagramPacket(ba, ba.length);
-
-				try {
-					socket.send(p);
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-
-				socket.disconnect();
-
-				return new CallResult(Atom.OK, CallResult.TIMEOUT_ZERO);
-
-			} catch (SocketException e) {
-				e.printStackTrace();
-				return new CallResult(Atom.IGNORE);
-
-			} catch (UnknownHostException e) {
-				e.printStackTrace();
-				return new CallResult(Atom.IGNORE);
-			}
-
-		}
-
-		else {
+			// TOXDO ... maybe return an indication of success/failure?
+			udpCast(side, ism);
+			return new CallResult(Atom.OK, CallResult.TIMEOUT_ZERO);
+		} else {
 			throw new RuntimeException();
 		}
 	}
@@ -112,42 +63,44 @@ public final class AccessUdpCb extends UdpCb {
 	@Override
 	public CallResult handleInfo(Object message) {
 
-		byte[] buffer = new byte[Main.DATAGRAM_MAX_SIZE];
-		DatagramPacket p = new DatagramPacket(buffer, buffer.length);
+		// byte[] buffer = new byte[Main.DATAGRAM_MAX_SIZE];
+		// DatagramPacket p = new DatagramPacket(buffer, buffer.length);
 		try {
 			// Util.seq(Level.debug, side, Util.Direction.NONE,
 			// String.format("start listening, port: %d", socket.getLocalPort()));
 
-			socket.receive(p);
-			final int recLength = p.getLength();
 
-			if (recLength <= Main.KEEPALIVE_MSG_MAX_SIZE) {
-				final KeepAliveMessage kam = new KeepAliveMessage(side, buffer, recLength);
-				Util.seq(Level.verbose, side, Direction.IN, kam.toString());
-				proxy.cast(kam);
+			
+			final UdpInfoResult udpInfoResult = udpInfo(side);
+
+			if (udpInfoResult.timedOut) {
+				return result;
+			} else if (udpInfoResult.datagramSize <= Main.KEEPALIVE_MSG_MAX_SIZE) {
+				final KeepAliveMessage kam = new KeepAliveMessage(side, recBuffer, udpInfoResult.datagramSize);
+				Util.seq(Mode.KEEP_ALIVE, side, Direction.IN, kam.toString());
+				proxy.cast(proxy, kam);
 			} else {
 				StringBuilder sb = new StringBuilder();
-				for (int j = 0; j < recLength; j++) {
-					sb.append((char) buffer[j]);
+				for (int j = 0; j < udpInfoResult.datagramSize; j++) {
+					sb.append((char) recBuffer[j]);
 				}
 
-				final SipMessage sipMessage = new SipMessage(buffer, recLength);
+				final SipMessage sipMessage = new SipMessage(recBuffer, udpInfoResult.datagramSize);
 
-				final byte[] sourceAddr = p.getAddress().getAddress();
-				final Integer sourcePort = Integer.valueOf(p.getPort());
+				final byte[] sourceAddr = udpInfoResult.sourceAddr;
+				final Integer sourcePort = udpInfoResult.sourcePort;
 
 				final InternalSipMessage iMsg = new InternalSipMessage(
 						side,
 						sipMessage,
-						Util.digest(buffer, recLength),
+						Util.digest(recBuffer, udpInfoResult.datagramSize),
 						null,
 						null,
 						sourceAddr,
 						sourcePort);
-				Util.seq(Level.verbose, side, Direction.IN, sipMessage.firstLine);
-				proxy.cast(iMsg);
+				Util.seq(Mode.SIP, side, Direction.IN, sipMessage.firstLine);
+				proxy.cast(proxy, iMsg);
 			}
-		} catch (SocketTimeoutException ignoreException) {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

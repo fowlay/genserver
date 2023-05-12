@@ -3,6 +3,16 @@ package st.foglo.stateless_proxy;
 import java.time.LocalDateTime;
 
 public final class Util {
+
+    public enum Mode {
+        START,                // start sequence
+        SIP,
+        SIPDEBUG,
+        KEEP_ALIVE,
+        DEBUG,
+        IGNORE,
+        GENSERVER             // provisional
+    }
 	
 	public enum Direction {
 		IN,
@@ -78,6 +88,68 @@ public final class Util {
 		}
 	}
 	
+
+
+
+
+
+
+	public static void seq(Mode mode, Side where, Direction towards, String text) {
+		
+        if (!isMember(mode, Main.TRACE_MODES)) {
+            return;
+        }
+		
+		final String arrowLeft = "<--";
+		final String arrowRight = "-->";
+		
+		final String arrow;
+		if (towards == Direction.NONE) {
+			arrow = "";
+		}
+		else if (towards == Direction.IN && where == Side.UE) {
+			arrow = arrowRight;
+		}
+		else if (towards == Direction.IN && where == Side.SP) {
+			arrow = arrowLeft;
+			
+		}
+		else if (towards == Direction.OUT && where == Side.UE) {
+			arrow = arrowLeft;
+		}
+		else if (towards == Direction.OUT && where == Side.SP) {
+			arrow = arrowRight;
+		}
+		else if (towards == Direction.UE && where == Side.PX) {
+			arrow = arrowLeft;
+		}
+		else if (towards == Direction.SP && where == Side.PX) {
+			arrow = arrowRight;
+		}
+		else {
+			throw new RuntimeException();
+		}
+		
+		String whiteSpace =
+            where == Side.UE ? white[1] :
+                where == Side.PX ? white[3] :
+                    where == Side.SP ? white[5] :
+                        where == Side.GS ? white[0] :
+                            "internal error";
+		
+
+        final Level[] levels = Level.values();
+		display(levels[0], String.format("%s%s %s", whiteSpace, arrow, text));
+	}
+
+
+    /**
+     * Deprecated - use seq(Mode ...)
+     * @param level
+     * @param where
+     * @param towards
+     * @param text
+     */
 	public static void seq(Level level, Side where, Direction towards, String text) {
 		
 		//System.out.println(String.format("%s|%s|%s|%s", level, where, towards, text));
@@ -151,4 +223,29 @@ public final class Util {
 		}
 		return sb.toString();
 	}
+
+	public static String bytesToIpAddress(byte[] buffer) {
+		final StringBuilder sb = new StringBuilder();
+		for (int j = 0; j < buffer.length; j++) {
+			final int code = buffer[j] < 0 ? buffer[j]+256 : buffer[j];
+			if (j == 0) {
+				sb.append(String.format("%d", code));
+			}
+			else {
+				sb.append(String.format(".%d", code));
+			}
+		}
+		return sb.toString();
+	}
+
+    private static boolean isMember(Mode m, Mode[] mm) {
+
+        for (Mode e : mm) {
+            if (m == e) {
+                return true;
+            }
+        }
+        return false;
+    }
 }
+

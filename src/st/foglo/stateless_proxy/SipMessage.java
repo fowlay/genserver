@@ -32,7 +32,7 @@ public class SipMessage {
 	 * 
 	 * Values are lists of as-received strings, no CR LF at end
 	 */
-	private final Map<String, List<String>> headers = new HashMap<String, List<String>>();
+	private final Map<String, LinkedList<String>> headers = new HashMap<String, LinkedList<String>>();
 	
 	/**
 	 * One long string, with embedded CR LF sequences
@@ -123,7 +123,7 @@ public class SipMessage {
 		String key = headerLine.substring(0, indexColon);
 		
 		if (headers.get(key) == null) {
-			List<String> hh = new LinkedList<String>();
+			LinkedList<String> hh = new LinkedList<String>();
 			hh.add(headerLine.substring(1+indexColon).trim());
 			headers.put(key, hh);
 			//Util.trace(Level.verbose, "+++ %s -> %s", key, headerLine);
@@ -141,7 +141,7 @@ public class SipMessage {
 		sb.append(firstLine);
 		sb.append(Character.valueOf((char) crLf[1]));
 		
-		for (Entry<String, List<String>> me : headers.entrySet()) {
+		for (Entry<String, LinkedList<String>> me : headers.entrySet()) {
 			final List<String> hh = me.getValue();
 			final String key = me.getKey();
 			for (String s : hh) {
@@ -171,8 +171,8 @@ public class SipMessage {
 	
 
 
-	public List<String> getHeaderFields(String key) {
-		final List<String> toHeaderFields = headers.get(key);
+	public LinkedList<String> getHeaderFields(String key) {
+		final LinkedList<String> toHeaderFields = headers.get(key);
 		if (toHeaderFields == null) {
 			return new LinkedList<String>();
 		}
@@ -231,8 +231,8 @@ public class SipMessage {
 	}
 
 	public void dropFirst(String key) {
-		final List<String> hh = getHeaderFields(key);
-		((LinkedList<String>)hh).removeFirst();
+		final LinkedList<String> hh = getHeaderFields(key);
+		hh.removeFirst();
 		if (hh.isEmpty()) {
 			headers.remove(key);
 		}
@@ -245,12 +245,12 @@ public class SipMessage {
 	 * @param key
 	 * @param headerFields
 	 */
-	public void setHeaderFields(String key, List<String> headerFields) {
+	public void setHeaderFields(String key, LinkedList<String> headerFields) {
 		headers.put(key, headerFields);
 	}
 
 	public void setHeaderField(String key, String headerField) {
-		final List<String> headerFields = new LinkedList<String>();
+		final LinkedList<String> headerFields = new LinkedList<String>();
 		headerFields.add(headerField);
 		setHeaderFields(key, headerFields);
 	}
@@ -267,7 +267,7 @@ public class SipMessage {
 		ba[k++] = 13;
 		ba[k++] = 10;
 
-		for (Map.Entry<String, List<String>> e : headers.entrySet()) {
+		for (Map.Entry<String, LinkedList<String>> e : headers.entrySet()) {
 			final String key = e.getKey();
 			for (String h : e.getValue()) {
 				for (byte b : key.getBytes()) {

@@ -31,6 +31,11 @@ public final class CallResult {
         this.reply = reply;
         this.timeoutMillis = timeoutMillis;
     }
+
+    public String toString() {
+        return String.format("[%s %s %d]",
+        code.toString(), reply == null ? "noreply" : "reply", timeoutMillis);
+    }
 }
 
 

@@ -27,10 +27,10 @@ public class GenServer_test {
         
         GenServer gs = GenServer.start(myCb, null);
         
-        gs.cast(null);
-        gs.cast(null);
-        gs.cast(null);
-        gs.cast(null);
+        gs.cast(gs, null);
+        gs.cast(gs, null);
+        gs.cast(gs, null);
+        gs.cast(gs, null);
     }
     
     @Test
@@ -38,12 +38,11 @@ public class GenServer_test {
         
         CallBack myCb = new MyCb2Class();
         
-        GenServer.start(myCb, null, 0);
+        GenServer.start(myCb, null, "my-cb-2", 0);
         
         try {
 			Thread.sleep(800);
 		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
     }
@@ -53,13 +52,13 @@ public class GenServer_test {
         
         CallBack myCb = new MyCb3Class();
         
-        GenServer gs = GenServer.start(myCb, null, 1);
+        GenServer gs = GenServer.start(myCb, null, "my-cb", 1);
         
-        MyCb3Class.Product p = (MyCb3Class.Product)gs.call((new MyCb3Class()).new TwoFactors(8, 9));
+        MyCb3Class.Product p = (MyCb3Class.Product)gs.call(gs, (new MyCb3Class()).new TwoFactors(8, 9));
         
         System.out.println(String.format("result: %d", p.product));
         
-        gs.cast(null);
+        gs.cast(gs, null);
 
     }
 }

@@ -4,7 +4,7 @@ public final class KeepAliveMessage extends MsgBase {
 	
 	final Side side;
 	final byte[] buffer;
-	int size;
+	final int size;
 	
 	
 	public KeepAliveMessage(Side side, byte[] buffer, int size) {
@@ -14,13 +14,14 @@ public final class KeepAliveMessage extends MsgBase {
 	}
 	
 	public String toString() {
-		final StringBuilder sb = new StringBuilder();
+		final StringBuilder sb = new StringBuilder("[");
 		for (int k = 0; k < size; k++) {
 			if (k > 0) {
-				sb.append(" ");
+				sb.append(",");
 			}
 			sb.append(String.format("%d", buffer[k]));
 		}
+        sb.append("]");
 		return sb.toString();
 	}
 }

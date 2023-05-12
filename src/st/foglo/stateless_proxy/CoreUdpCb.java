@@ -1,143 +1,94 @@
 package st.foglo.stateless_proxy;
 
-import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.SocketAddress;
-import java.net.SocketException;
-import java.net.SocketTimeoutException;
-import java.net.UnknownHostException;
-
-import st.foglo.genserver.Atom;
 import st.foglo.genserver.CallResult;
 import st.foglo.genserver.GenServer;
 import st.foglo.stateless_proxy.Util.Direction;
-import st.foglo.stateless_proxy.Util.Level;
+import st.foglo.stateless_proxy.Util.Mode;
 
 public class CoreUdpCb extends UdpCb {
+
+	final byte[] sipAddrSp;
+	final int sipPortSp;
 	
-	public CoreUdpCb(Side side, GenServer proxy, byte[] outgoingProxyAddr, Integer outgoingProxyPort) {
+	public CoreUdpCb(Side side, GenServer proxy,
+				byte[] sipAddrSp, int sipPortSp,
+				byte[] outgoingProxyAddr, Integer outgoingProxyPort) {
 		super(side, proxy);
+		this.sipAddrSp = sipAddrSp;
+		this.sipPortSp = sipPortSp;
 		this.outgoingProxyAddr = outgoingProxyAddr;
 		this.outgoingProxyPort = outgoingProxyPort.intValue();
 	}
 	
 	@Override
 	public CallResult init(Object[] ignored) {
-		
-		Util.seq(Level.debug, side, Direction.NONE, "enter init");
-		
-		try {
-			socket = new DatagramSocket();
-			socket.setSoTimeout(Main.SO_TIMEOUT);
-			
 
+		super.init(ignored);
 
-			final SocketAddress sa = UdpCb.createSocketAddress(outgoingProxyAddr, outgoingProxyPort);
+		channelWrapper = new ChannelWrapper(side, sipAddrSp, sipPortSp, outgoingProxyAddr, outgoingProxyPort);
 
-			socket.connect(sa);
-			
-			Util.seq(Level.debug, side, Direction.NONE, "done init");
-			
-			return new CallResult(Atom.OK, CallResult.TIMEOUT_ZERO);
-			
-		} catch (SocketException e) {
-			e.printStackTrace();
-			return new CallResult(Atom.IGNORE);
-			
-		} catch (UnknownHostException e) {
-			e.printStackTrace();
-			return new CallResult(Atom.IGNORE);
-		}
-	}
-
-	@Override
-	public CallResult handleCast(Object message) {
-		// send a UDP message
-		MsgBase mb = (MsgBase) message;
-		if (mb instanceof KeepAliveMessage) {
-			final KeepAliveMessage kam = (KeepAliveMessage) mb;
-			
-			// always use outbound proxy
-			
-			Util.seq(Level.verbose, side, Direction.OUT, kam.toString());
-		
-			try {
-				final DatagramPacket p = new DatagramPacket(kam.buffer, kam.size);
-				socket.send(p);
-
-			} catch (IOException e) {
-				e.printStackTrace();
-				System.exit(1);
-			}
-		}
-
-		else if (mb instanceof InternalSipMessage) {
-
-			final InternalSipMessage ism = (InternalSipMessage) mb;
-			
-			//Util.trace(Level.verbose, "%s send a forwarded message: castCount: %d%n%s", side.toString(), castCount, ism.message.toString());
-			Util.seq(Level.verbose, side, Direction.OUT, ism.message.firstLine);
-			
-			
-			// if the message comes with destination info, then use it,
-			// else use outbound proxy
-		
-			final byte[] ba = ism.message.toByteArray();
-			
-			try {
-				final DatagramPacket p = new DatagramPacket(ba, ba.length);
-				socket.send(p);
-
-			} catch (IOException e) {
-				e.printStackTrace();
-				System.exit(1);
-			}
-		}
-		else {
-			throw new RuntimeException();
-		}
+		Util.seq(Mode.START, side, Direction.NONE, "enter init");
+		final CallResult result = udpInit(side, outgoingProxyAddr, outgoingProxyPort);
+		Util.seq(Mode.START, side, Direction.NONE, String.format("done init, returning: %s", result.toString()));
 		return result;
 	}
 
 	@Override
+	public CallResult handleCast(Object message) {
+		MsgBase mb = (MsgBase) message;
+		if (mb instanceof KeepAliveMessage) {
+			final CallResult result = handleKeepAliveMessage(side, (KeepAliveMessage)mb);
+			return result;
+		} else if (mb instanceof InternalSipMessage) {
+
+			final InternalSipMessage ism = (InternalSipMessage) mb;
+			//Util.trace(Level.verbose, "%s send a forwarded message: castCount: %d%n%s", side.toString(), castCount, ism.message.toString());
+			Util.seq(Mode.SIP, side, Direction.OUT, ism.message.firstLine);
+			// if the message comes with destination info, then use it,
+			// else use outbound proxy
+
+			udpCast(side, ism);
+
+			return result;
+		}
+		else {
+			throw new RuntimeException();
+		}
+	}
+
+
+
+	@Override
 	public CallResult handleInfo(Object message) {
+		// byte[] buffer = new byte[Main.DATAGRAM_MAX_SIZE];
+		// DatagramPacket p = new DatagramPacket(buffer, buffer.length);
+		// socket.receive(p);
 
-		byte[] buffer = new byte[Main.DATAGRAM_MAX_SIZE];
-		DatagramPacket p = new DatagramPacket(buffer, buffer.length);
-		try {
-			socket.receive(p);
-			final int recLength = p.getLength();
+		final UdpInfoResult udpInfoResult = udpInfo(side);
 
-			if (recLength <= Main.KEEPALIVE_MSG_MAX_SIZE) {
-				final KeepAliveMessage kam = new KeepAliveMessage(side, buffer, recLength);
-				Util.seq(Level.verbose, side, Direction.IN, kam.toString());
-				proxy.cast(kam);
+		if (udpInfoResult.timedOut) {
+			return result;
+		} else if (udpInfoResult.datagramSize <= Main.KEEPALIVE_MSG_MAX_SIZE) {
+			final KeepAliveMessage kam = new KeepAliveMessage(side, recBuffer, udpInfoResult.datagramSize);
+			Util.seq(Mode.KEEP_ALIVE, side, Direction.IN, kam.toString());
+			proxy.cast(proxy, kam);
+		} else {
+			StringBuilder sb = new StringBuilder();
+			for (int j = 0; j < udpInfoResult.datagramSize; j++) {
+				sb.append((char) recBuffer[j]);
 			}
-			else {
-				StringBuilder sb = new StringBuilder();
-				for (int j = 0; j < recLength; j++) {
-					sb.append((char) buffer[j]);
-				}
 
-				final SipMessage sipMessage =
-						new SipMessage(buffer, recLength);
-				final InternalSipMessage iMsg =
-						new InternalSipMessage(
-								side,
-								sipMessage,
-								Util.digest(buffer, recLength),
-								null,
-								null);
-				Util.seq(Level.verbose, side, Direction.IN, sipMessage.firstLine);
-				proxy.cast(iMsg);
-			}
+			final SipMessage sipMessage = new SipMessage(recBuffer, udpInfoResult.datagramSize);
+			final InternalSipMessage iMsg = new InternalSipMessage(
+					side,
+					sipMessage,
+					Util.digest(recBuffer, udpInfoResult.datagramSize),
+					null,
+					null);
+			Util.seq(Mode.SIP, side, Direction.IN, sipMessage.firstLine);
+			proxy.cast(proxy, iMsg);
 		}
-		catch (SocketTimeoutException ignoreException) {
-		}
-		catch (Exception e) {
-			e.printStackTrace();
-		}
+
 		return result;
 	}
 }
