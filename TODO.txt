@@ -121,18 +121,33 @@ DONE: Handling of k-a-m messages: Move the drop decision to the proxy.
 DONE: GenServer: Protect the running thread against execptions when
 doing callbacks.
 
+-----------------------------------
+
+DONE: GenServer: Should handle the IGNORE result when calling Cb:init().
+
+------------------------------------------
+
+DONE: GenServer: Coding mistake to fix, methods like GenServer.cast
+should not pass the GenServer instance as an argument.
+
+------------------------------
+
+DONE: Make the CallBackResult data type specific to the callback:
+
+   InitResult CastResult CallResult InfoResult
+
+A base class can be introduced. Make all of this be inner classes in
+GenServer?
+
 -----------------------------------------
+
+GenServer: Should the handleInfo method be renamed, or keep it for
+Erlang similarity?
+
+------------------------------------------
 
 Add an Info class that can summarize counters and such, with a telnet
 server operator interface (supporting one operator at a time).
-
-------------------------------------------
-GenServer: Coding mistake to fix, methods like GenServer.cast should
-not pass the GenServer instance as argument
-
------------------------------------------
-
-Remove the Interrupter class. Or keep it, as configurable option?
 
 ------------------------------------------
 
@@ -144,7 +159,22 @@ GenServer: The package must not have external dependencies.
 
 -------------------------------------------
 
-GenServer: Make the "interrupt" action a specifically enabled feature.
+GenServer: Make the "interrupt" action a specifically enabled
+feature. This is hardly needed if the cooperative model below is
+implemented.
+
+-----------------------------------------
+
+Remove the Interrupter class. Or keep it, as configurable option?
+
+------------------------------------------
+
+GenServer: Improve the use of interrupt. Introduce a subclass of
+java.lang.Thread (GenServerThread), holding a volatile variable by
+which the callback module can cooperatively tell the GenServer process
+that it is prepared to be interrupted. Accessor functions for this
+variable shall be provided in GenServerThread. Note the need to call
+Thread.interrupted() when leaving the interruptable section.
 
 ------------------------------------------
 
@@ -186,19 +216,9 @@ The MicroSIP client has configuration options for ports and
 
 Blacklisting: Blacklisted patterns from file?
 
------------------------------------
+--------------------------------------
 
-GenServer: Should handle the IGNORE result when calling Cb:init().
-There should be some principle of fault handling.
-
-------------------------------
-
-Make the CallBackResult data type specific to the callback:
-
-   InitResult CastResult CallResult InfoResult
-
-A base class can be introduced. Make all of this be inner classes in
-GenServer?
+GenServer: There should be some principle of fault handling.
 
 ------------------------------------
 

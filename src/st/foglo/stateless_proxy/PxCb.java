@@ -6,8 +6,11 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
 import st.foglo.genserver.CallBack;
-import st.foglo.genserver.CallResult;
 import st.foglo.genserver.GenServer;
+import st.foglo.genserver.GenServer.CallResult;
+import st.foglo.genserver.GenServer.CastResult;
+import st.foglo.genserver.GenServer.InfoResult;
+import st.foglo.genserver.GenServer.InitResult;
 import st.foglo.stateless_proxy.SipMessage.Method;
 import st.foglo.stateless_proxy.SipMessage.TYPE;
 import st.foglo.stateless_proxy.Util.Direction;
@@ -38,7 +41,7 @@ public final class PxCb implements CallBack {
 	///////////////////////////////////////////
 
 	@Override
-	public CallResult init(Object[] args) {
+	public InitResult init(Object[] args) {
 
 		Util.seq(Mode.START, Side.PX, Util.Direction.NONE, "enter init");
 
@@ -49,11 +52,11 @@ public final class PxCb implements CallBack {
 
 		Util.seq(Mode.START, Side.PX, Util.Direction.NONE, "done init");
 
-		return new CallResult(Atom.OK, null);
+		return new InitResult(Atom.OK);
 	}
 
 	@Override
-	public CallResult handleCast(Object message) {
+	public CastResult handleCast(Object message) {
 
 		MsgBase mb = (MsgBase) message;
 		if (mb instanceof PortSendersMsg) {
@@ -65,7 +68,7 @@ public final class PxCb implements CallBack {
 			portSenders.put(Side.UE, plm.uePortSender);
 			portSenders.put(Side.SP, plm.spPortSender);
 
-			return new CallResult(Atom.NOREPLY);
+			return new CastResult(Atom.NOREPLY);
 		} else if (mb instanceof KeepAliveMessage) {
 			final KeepAliveMessage kam = (KeepAliveMessage) message;
 			final Side side = kam.side;
@@ -78,11 +81,11 @@ public final class PxCb implements CallBack {
                 final Side otherSide = otherSide(side);
                 Util.seq(Mode.KEEP_ALIVE, Side.PX, direction(side, otherSide), mb.toString());
                 GenServer gsForward = portSenders.get(otherSide);
-                gsForward.cast(gsForward, kam);
-                return new CallResult(Atom.NOREPLY);
+                gsForward.cast(kam);
+                return new CastResult(Atom.NOREPLY);
             }
 
-			return new CallResult(Atom.NOREPLY);
+			return new CastResult(Atom.NOREPLY);
 
 		} else if (mb instanceof InternalSipMessage) {
 
@@ -175,7 +178,7 @@ public final class PxCb implements CallBack {
 							final byte[] addr = ((InetSocketAddress) sa).getAddress().getAddress();
 							final Integer port = Integer.valueOf(((InetSocketAddress) sa).getPort());
 							final GenServer gsForward = portSenders.get(otherSide);
-							gsForward.cast(gsForward, ism.setDestination(addr, port));
+							gsForward.cast(ism.setDestination(addr, port));
 						}
 					} else if (otherSide == Side.SP) {
 
@@ -186,7 +189,7 @@ public final class PxCb implements CallBack {
 						final GenServer gsForward = portSenders.get(otherSide);
 						//Util.trace(Level.verbose, "about to cast: %s", ism.message.toString());
                         Util.seq(Mode.SIPDEBUG, side, Direction.NONE, String.format("gsForward thread name is: %s", gsForward.getThread().getName()));
-						gsForward.cast(gsForward, ism.setDestination(addr, port));
+						gsForward.cast(ism.setDestination(addr, port));
 					}
 
 				} else if (sm.type == TYPE.response) {
@@ -237,7 +240,6 @@ public final class PxCb implements CallBack {
 
 					final GenServer gsForward = portSenders.get(otherSide);
 					gsForward.cast(
-                            gsForward,
 							new InternalSipMessage(
 									ism.side, ism.message, Integer.valueOf(0), toByteArray(destAddr),
 									Integer.valueOf(Integer.parseInt(destPort))));
@@ -247,11 +249,9 @@ public final class PxCb implements CallBack {
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
-
-			return new CallResult(Atom.NOREPLY);
+			return new CastResult(Atom.NOREPLY);
 		} else {
-			// make some noise
-			return new CallResult(Atom.NOREPLY);
+			throw new RuntimeException();
 		}
 	}
 
@@ -271,7 +271,7 @@ public final class PxCb implements CallBack {
 	}
 
 	@Override
-	public CallResult handleInfo(Object message) {
+	public InfoResult handleInfo(Object message) {
 		throw new UnsupportedOperationException();
 	}
 

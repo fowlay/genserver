@@ -27,10 +27,10 @@ public class GenServer_test {
         
         GenServer gs = GenServer.start(myCb, null);
         
-        gs.cast(gs, null);
-        gs.cast(gs, null);
-        gs.cast(gs, null);
-        gs.cast(gs, null);
+        gs.cast(null);
+        gs.cast(null);
+        gs.cast(null);
+        gs.cast(null);
     }
     
     @Test
@@ -58,7 +58,7 @@ public class GenServer_test {
         
         System.out.println(String.format("result: %d", p.product));
         
-        gs.cast(gs, null);
+        gs.cast(null);
 
     }
 }

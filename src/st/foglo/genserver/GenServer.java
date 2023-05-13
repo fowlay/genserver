@@ -34,6 +34,75 @@ public final class GenServer implements Runnable {
 
     private volatile boolean isHandlingInfo = false;
 
+
+    public static abstract class ResultBase {
+
+        final Atom code;
+        final long timeoutMillis;
+
+        public ResultBase(Atom code, long timeoutMillis) {
+            this.code = code;
+            this.timeoutMillis = timeoutMillis;
+        }
+    }
+
+    public static final class InitResult extends ResultBase {
+        public InitResult(Atom code) {
+            this(code, CallBack.TIMEOUT_NEVER);
+        }
+        public InitResult(Atom code, long timeoutMillis) {
+            super(code, timeoutMillis);
+            if (!(code == Atom.OK || code == Atom.IGNORE)) {
+                throw new IllegalArgumentException();
+            }
+        }
+    }
+
+    public static final class CastResult extends ResultBase {
+        public CastResult(Atom code) {
+            this(code, CallBack.TIMEOUT_NEVER);
+        }
+        public CastResult(Atom code, long timeoutMillis) {
+            super(code, timeoutMillis);
+            if (!(code == Atom.NOREPLY || code == Atom.STOP)) {
+                throw new IllegalArgumentException();
+            }
+        }
+    }
+
+    public static final class InfoResult extends ResultBase {
+        public InfoResult(Atom code) {
+            this(code, CallBack.TIMEOUT_NEVER);
+        }
+        public InfoResult(Atom code, long timeoutMillis) {
+            super(code, timeoutMillis);
+            if (!(code == Atom.NOREPLY || code == Atom.STOP)) {
+                throw new IllegalArgumentException();
+            }
+        }
+    }
+
+    public static final class CallResult extends ResultBase {
+        final Object reply;
+
+        public CallResult(Atom code) {
+            this(code, null);
+        }
+
+        public CallResult(Atom code, Object reply) {
+            this(code, reply, CallBack.TIMEOUT_NEVER);
+        }
+
+        public CallResult(Atom code, Object reply, long timeoutMillis) {
+            super(code, timeoutMillis);
+            this.reply = reply;
+            if (!(code == Atom.REPLY || code == Atom.STOP)) {
+                throw new IllegalArgumentException();
+            }
+        }
+    }
+
+
     private class GsMessage {
         final Atom keyword;
         final Object object;
@@ -95,19 +164,18 @@ public final class GenServer implements Runnable {
         }
     }
 
-    public void cast(GenServer gs, Object object) {
-        // TODO - eliminate the gs argument
+    public void cast(Object object) {
 
         Util.seq(Mode.GENSERVER, Side.PX, Direction.NONE,
-                String.format("gsForward thread name is: %s", gs.getThread().getName()));
+                String.format("gsForward thread name is: %s", getThread().getName()));
 
         Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE,
-                String.format("about to insert! - we are using instance: %s %s", gs.threadName,
-                        gs.getThread().getName()));
-        insertMessage(gs, new GsMessage(Atom.CAST, object));
+                String.format("about to insert! - we are using instance: %s %s", threadName,
+                        getThread().getName()));
+        insertMessage(new GsMessage(Atom.CAST, object));
         Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE, String.format(
-                "about to MAYBE interrupt! - we are using instance: %s %s", gs.threadName, gs.getThread().getName()));
-        if (accessIsHandlingInfo(gs, false, false)) {
+                "about to MAYBE interrupt! - we are using instance: %s %s", threadName, getThread().getName()));
+        if (accessIsHandlingInfo(false, false)) {
             Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE, "about to interrupt!");
             getThread().interrupt();
             Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE, "done interrupt!");
@@ -117,8 +185,8 @@ public final class GenServer implements Runnable {
     public Object call(GenServer gs, Object object) {
         // TODO - eliminate the gs argument
 
-        insertMessage(gs, new GsMessage(Atom.CALL, object));
-        if (accessIsHandlingInfo(gs, false, false)) {
+        insertMessage(new GsMessage(Atom.CALL, object));
+        if (accessIsHandlingInfo(false, false)) {
             getThread().interrupt();
         }
 
@@ -149,20 +217,22 @@ public final class GenServer implements Runnable {
             threadName = Thread.currentThread().getName();
         }
         
-        CallResult cr = null;
+        InitResult icr = null;
+        CallResult ccr = null;
+        CastResult kcr = null; // TODO; improve locality
 
         try {
-            cr = cb.init(args);
+            icr = cb.init(args);
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-        if (cr.code == Atom.IGNORE) {
+        if (icr.code == Atom.IGNORE) {
             return;
         }
 
         synchronized (monitorTimeout) {
-            timeout = cr.timeoutMillis;
+            timeout = icr.timeoutMillis;
         }
 
         synchronized (monitorInitialized) {
@@ -188,22 +258,22 @@ public final class GenServer implements Runnable {
 
                             GsMessage message = new GsMessage(Atom.TIMEOUT, null);
                            
-                            accessIsHandlingInfo(this, true, true);
+                            accessIsHandlingInfo(true, true);
 
                             Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE,
-                                String.format("%s isHandlingInfo is: %b", Thread.currentThread().getName(), accessIsHandlingInfo(this, false, false)));
+                                String.format("%s isHandlingInfo is: %b", Thread.currentThread().getName(), accessIsHandlingInfo(false, false)));
                             
-                            CallResult crInfo = null;
+                            InfoResult crInfo = null;
                             try {
                                 crInfo = cb.handleInfo(message);
                             } catch (Exception e) {
                                 e.printStackTrace();
                             }
 
-                            accessIsHandlingInfo(this, true, false);
+                            accessIsHandlingInfo(true, false);
 
 			                Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE,
-                                String.format("%s isHandlingInfo is: %b", Thread.currentThread().getName(), accessIsHandlingInfo(this, false, false)));
+                                String.format("%s isHandlingInfo is: %b", Thread.currentThread().getName(), accessIsHandlingInfo(false, false)));
                                 
                             if (crInfo.code == Atom.STOP) {
                                 try {
@@ -237,21 +307,21 @@ public final class GenServer implements Runnable {
                 }
                 
                 if (m.keyword == Atom.CAST) {
-                    cr = null;
+                    kcr = null;
                     try {
-                        cr = cb.handleCast(m.object);
+                        kcr = cb.handleCast(m.object);
                     }
                     catch (Exception e) {
                         e.printStackTrace();
                     }
                     
-                    if (cr.timeoutMillis >= 0) {
+                    if (kcr.timeoutMillis >= 0) {
                         synchronized (monitorTimeout) {
-                            timeout = cr.timeoutMillis;
+                            timeout = kcr.timeoutMillis;
                         }
                     }
                     
-                    if (cr.code == Atom.STOP) {
+                    if (kcr.code == Atom.STOP) {
                         try {
                             cb.handleTerminate();
                         } catch (Exception e) {
@@ -263,19 +333,19 @@ public final class GenServer implements Runnable {
 
                 else if (m.keyword == Atom.CALL) {
                     try {
-                        cr = cb.handleCall(m.object);
+                        ccr = cb.handleCall(m.object);
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
                     
-                    if (cr.timeoutMillis >= 0) {
+                    if (ccr.timeoutMillis >= 0) {
                         synchronized (monitorTimeout) {
-                            timeout = cr.timeoutMillis;
+                            timeout = ccr.timeoutMillis;
                         }
                     }
                     
                     synchronized(monitorCallResult) {
-                        callResult = cr;
+                        callResult = ccr;
                         try {
                             monitorCallResult.wait();
                         } catch (InterruptedException e) {
@@ -283,7 +353,7 @@ public final class GenServer implements Runnable {
                         }
                     }
 
-                    if (cr.code == Atom.STOP) {
+                    if (ccr.code == Atom.STOP) {
                         try {
                             cb.handleTerminate();
                         }
@@ -297,21 +367,21 @@ public final class GenServer implements Runnable {
         }
     }
     
-    private void insertMessage(GenServer gs, GsMessage message) {
+    private void insertMessage(GsMessage message) {
         Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE, "insertMessage 1");
         final boolean wasEmpty;
-        synchronized (gs.monitorMessageQueue) {
-            wasEmpty = gs.messageQueue.isEmpty();
-            gs.messageQueue.add(message);
+        synchronized (monitorMessageQueue) {
+            wasEmpty = messageQueue.isEmpty();
+            messageQueue.add(message);
         }
         Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE, "insertMessage 2");
         if (wasEmpty) {
             try {
-                synchronized (gs.monitorTimeout) {
+                synchronized (monitorTimeout) {
                     Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE, "insertMessage 2.1");
-                    gs.timeout = -1;
+                    timeout = -1;
                     Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE, "insertMessage 2.2");
-                    gs.monitorTimeout.notify();
+                    monitorTimeout.notify();
                     Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE, "insertMessage 2.3");
                 }
             } catch (IllegalMonitorStateException x) {
@@ -321,18 +391,18 @@ public final class GenServer implements Runnable {
         Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE, "insertMessage 3");
     }
 
-    public synchronized boolean accessIsHandlingInfo(GenServer gs, boolean update, boolean value) {
+    public synchronized boolean accessIsHandlingInfo(boolean update, boolean value) {
         if (update) {
-            final boolean oldValue = gs.isHandlingInfo;
-            gs.isHandlingInfo = value;
+            final boolean oldValue = isHandlingInfo;
+            isHandlingInfo = value;
             Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE,
-                String.format("%s isHandlingInfo: %b -> %b%n", gs.threadName, oldValue, gs.isHandlingInfo));
+                String.format("%s isHandlingInfo: %b -> %b%n", threadName, oldValue, isHandlingInfo));
             return oldValue;
         }
         else {
 	        Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE,
-                String.format("%s isHandlingInfo: value retrieved: %b", gs.threadName, gs.isHandlingInfo));
-            return gs.isHandlingInfo;
+                String.format("%s isHandlingInfo: value retrieved: %b", threadName, isHandlingInfo));
+            return isHandlingInfo;
         }
     }
     

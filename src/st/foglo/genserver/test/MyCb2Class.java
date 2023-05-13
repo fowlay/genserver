@@ -1,7 +1,7 @@
 package st.foglo.genserver.test;
 
 import st.foglo.genserver.CallBack;
-import st.foglo.genserver.CallResult;
+import st.foglo.genserver.GenServer;
 import st.foglo.genserver.Atom;
 
 public final class MyCb2Class implements CallBack {
@@ -12,19 +12,18 @@ public final class MyCb2Class implements CallBack {
 	/////////////////////////////////////////
 
 	@Override
-	public CallResult init(Object[] args) {
+	public GenServer.InitResult init(Object[] args) {
 		System.out.println(String.format("in init"));
-		return new CallResult(Atom.OK, 200);
+		return new GenServer.InitResult(Atom.OK, 200);
 	}
 
 	@Override
-	public CallResult handleCast(Object message) {
-		// TODO Auto-generated method stub
+	public GenServer.CastResult handleCast(Object message) {
 		return null;
 	}
 
 	@Override
-	public CallResult handleInfo(Object message) {
+	public GenServer.InfoResult handleInfo(Object message) {
 
 		count++;
 		
@@ -32,11 +31,11 @@ public final class MyCb2Class implements CallBack {
 		
 		if (count == 3) {
 			
-			return new CallResult(Atom.STOP);
+			return new GenServer.InfoResult(Atom.STOP);
 			
 		}
 		else {
-			return new CallResult(Atom.NOREPLY, 2000);
+			return new GenServer.InfoResult(Atom.NOREPLY, 2000);
 		}
 				
 		
@@ -44,7 +43,7 @@ public final class MyCb2Class implements CallBack {
 	}
 
 	@Override
-	public CallResult handleCall(Object message) {
+	public GenServer.CallResult  handleCall(Object message) {
 //		Keyword kk = ((GsMessage)message).keyword;
 //		Object m = ((GsMessage)message).object;
 		return null;

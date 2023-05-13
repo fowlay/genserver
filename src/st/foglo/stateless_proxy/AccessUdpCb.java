@@ -1,7 +1,9 @@
 package st.foglo.stateless_proxy;
 
 import st.foglo.genserver.Atom;
-import st.foglo.genserver.CallResult;
+import st.foglo.genserver.GenServer.CastResult;
+import st.foglo.genserver.GenServer.InfoResult;
+import st.foglo.genserver.GenServer.InitResult;
 import st.foglo.genserver.GenServer;
 import st.foglo.stateless_proxy.SipMessage.TYPE;
 import st.foglo.stateless_proxy.Util.Direction;
@@ -21,7 +23,7 @@ public final class AccessUdpCb extends UdpCb {
 	/////////////////////////////////////////////////
 
 	@Override
-	public CallResult init(Object[] args) {
+	public InitResult init(Object[] args) {
 		Util.seq(Mode.START, side, Direction.NONE, "enter init");
 
 		super.init(args);
@@ -29,7 +31,7 @@ public final class AccessUdpCb extends UdpCb {
 		channelWrapper = new ChannelWrapper(side, localAddr, localPort, null, -1);
 
 		// side effect on socket
-		final CallResult result = udpInit(side, localAddr, localPort);
+		final InitResult result = udpInit(side, localAddr, localPort);
 		Util.seq(Mode.START, side, Direction.NONE, "done init");
 		return result;
 	}
@@ -37,11 +39,11 @@ public final class AccessUdpCb extends UdpCb {
 
 
 	@Override
-	public CallResult handleCast(Object message) {
+	public CastResult handleCast(Object message) {
 
 		MsgBase mb = (MsgBase) message;
 		if (mb instanceof KeepAliveMessage) {
-			final CallResult result = handleKeepAliveMessage(side, (KeepAliveMessage)mb);
+			final CastResult result = handleKeepAliveMessage(side, (KeepAliveMessage)mb);
 			return result;
 		} else if (mb instanceof InternalSipMessage) {
 			final InternalSipMessage ism = (InternalSipMessage) message;
@@ -54,14 +56,14 @@ public final class AccessUdpCb extends UdpCb {
 
 			// TOXDO ... maybe return an indication of success/failure?
 			udpCast(side, ism);
-			return new CallResult(Atom.OK, CallResult.TIMEOUT_ZERO);
+			return new CastResult(Atom.NOREPLY, TIMEOUT_ZERO);
 		} else {
 			throw new RuntimeException();
 		}
 	}
 
 	@Override
-	public CallResult handleInfo(Object message) {
+	public InfoResult handleInfo(Object message) {
 
 		// byte[] buffer = new byte[Main.DATAGRAM_MAX_SIZE];
 		// DatagramPacket p = new DatagramPacket(buffer, buffer.length);
@@ -74,11 +76,11 @@ public final class AccessUdpCb extends UdpCb {
 			final UdpInfoResult udpInfoResult = udpInfo(side);
 
 			if (udpInfoResult.timedOut) {
-				return result;
+				return new InfoResult(Atom.NOREPLY, TIMEOUT_ZERO);
 			} else if (udpInfoResult.datagramSize <= Main.KEEPALIVE_MSG_MAX_SIZE) {
 				final KeepAliveMessage kam = new KeepAliveMessage(side, recBuffer, udpInfoResult.datagramSize);
 				Util.seq(Mode.KEEP_ALIVE, side, Direction.IN, kam.toString());
-				proxy.cast(proxy, kam);
+				proxy.cast(kam);
 			} else {
 				StringBuilder sb = new StringBuilder();
 				for (int j = 0; j < udpInfoResult.datagramSize; j++) {
@@ -99,11 +101,11 @@ public final class AccessUdpCb extends UdpCb {
 						sourceAddr,
 						sourcePort);
 				Util.seq(Mode.SIP, side, Direction.IN, sipMessage.firstLine);
-				proxy.cast(proxy, iMsg);
+				proxy.cast(iMsg);
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		return result;
+		return new InfoResult(Atom.NOREPLY, TIMEOUT_ZERO);
 	}
 }

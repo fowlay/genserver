@@ -1,6 +1,14 @@
 package st.foglo.genserver;
 
+import st.foglo.genserver.GenServer.CallResult;
+import st.foglo.genserver.GenServer.CastResult;
+import st.foglo.genserver.GenServer.InfoResult;
+import st.foglo.genserver.GenServer.InitResult;
+
 public interface CallBack {
+
+    public static final long TIMEOUT_ZERO = 0;
+    public static final long TIMEOUT_NEVER = -1;
     
 	/**
 	 * This method is called when a GenServer instance is started.
@@ -9,7 +17,7 @@ public interface CallBack {
 	 * CallResult.code = ok | stop
 	 * CallResult.timeoutMillis = -1 | 0..
 	 */
-    public CallResult init(Object[] args);
+    public InitResult init(Object[] args);
     
     /**
      * This method casts a message to the GenServer.
@@ -18,7 +26,7 @@ public interface CallBack {
      * CallResult.code = noreply | stop
      * CallResult.timeoutMillis = -1 | 0..
      */
-    public CallResult handleCast(Object message);
+    public CastResult handleCast(Object message);
 
     /**
      * This method implements a synchronous call.
@@ -36,7 +44,7 @@ public interface CallBack {
      * CallResult.code = noreply | stop
      * CallResult.timeoutMillis = -1 | 0..
      */
-    public CallResult handleInfo(Object message);
+    public InfoResult handleInfo(Object message);
     
     /**
      * This method is called when the server is terminating.

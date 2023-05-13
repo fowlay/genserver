@@ -1,7 +1,11 @@
 package st.foglo.genserver.test;
 
 import st.foglo.genserver.CallBack;
-import st.foglo.genserver.CallResult;
+import st.foglo.genserver.OldCallResult;
+import st.foglo.genserver.GenServer.CallResult;
+import st.foglo.genserver.GenServer.CastResult;
+import st.foglo.genserver.GenServer.InfoResult;
+import st.foglo.genserver.GenServer.InitResult;
 import st.foglo.genserver.Atom;
 
 public final class MyCbClass implements CallBack {
@@ -11,22 +15,19 @@ public final class MyCbClass implements CallBack {
     /////////////////////
 
     @Override
-    public CallResult init(Object[] ignoredArgs) {
-        return new CallResult(Atom.OK);
+    public InitResult init(Object[] ignoredArgs) {
+        return new InitResult(Atom.OK);
     }
 
     @Override
-    public CallResult handleCast(Object message) {
-
+    public CastResult handleCast(Object message) {
     	count++;
-        
         System.out.println(String.format("new value: %d", count));
-        
-        return new CallResult(Atom.NOREPLY, CallResult.TIMEOUT_NEVER);
+        return new CastResult(Atom.NOREPLY, OldCallResult.TIMEOUT_NEVER);
     }
 
     @Override
-    public CallResult handleInfo(Object message) {
+    public InfoResult handleInfo(Object message) {
     	return null;
     }
 

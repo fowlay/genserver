@@ -1,7 +1,10 @@
 package st.foglo.genserver.test;
 
 import st.foglo.genserver.CallBack;
-import st.foglo.genserver.CallResult;
+import st.foglo.genserver.GenServer.CallResult;
+import st.foglo.genserver.GenServer.CastResult;
+import st.foglo.genserver.GenServer.InfoResult;
+import st.foglo.genserver.GenServer.InitResult;
 import st.foglo.genserver.Atom;
 
 public final class MyCb3Class implements CallBack {
@@ -27,17 +30,17 @@ public final class MyCb3Class implements CallBack {
 	/////////////////////
 
 	@Override
-	public CallResult init(Object[] args) {
-		return new CallResult(Atom.OK);
+	public InitResult init(Object[] args) {
+		return new InitResult(Atom.OK);
 	}
 
 	@Override
-	public CallResult handleCast(Object message) {
-		return new CallResult(Atom.STOP);
+	public CastResult handleCast(Object message) {
+		return new CastResult(Atom.STOP);
 	}
 
 	@Override
-	public CallResult handleInfo(Object message) {
+	public InfoResult handleInfo(Object message) {
 		return null;
 	}
 

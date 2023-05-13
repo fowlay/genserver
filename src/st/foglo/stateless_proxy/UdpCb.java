@@ -15,7 +15,10 @@ import java.nio.channels.DatagramChannel;
 
 import st.foglo.genserver.Atom;
 import st.foglo.genserver.CallBack;
-import st.foglo.genserver.CallResult;
+import st.foglo.genserver.GenServer.CallResult;
+import st.foglo.genserver.GenServer.CastResult;
+import st.foglo.genserver.GenServer.InfoResult;
+import st.foglo.genserver.GenServer.InitResult;
 import st.foglo.genserver.GenServer;
 import st.foglo.stateless_proxy.Util.Direction;
 import st.foglo.stateless_proxy.Util.Mode;
@@ -30,7 +33,8 @@ public abstract class UdpCb implements CallBack {
 		this.proxy = proxy;
 	}
 
-	protected final CallResult result = new CallResult(Atom.NOREPLY, CallResult.TIMEOUT_ZERO);
+	protected final InitResult initResult = new InitResult(Atom.OK, CallBack.TIMEOUT_ZERO);
+    protected final CastResult castResult = new CastResult(Atom.NOREPLY, CallBack.TIMEOUT_ZERO);
 	protected final Side side;
 	protected final GenServer proxy;
 	protected byte[] outgoingProxyAddr;
@@ -150,17 +154,17 @@ public abstract class UdpCb implements CallBack {
 
 
 	@Override
-	public CallResult init(Object[] args) {
+	public InitResult init(Object[] args) {
 		thread = Thread.currentThread();
 		byteBuffer = ByteBuffer.allocate(Main.DATAGRAM_MAX_SIZE);
-		return null;
+		return new InitResult(Atom.OK, TIMEOUT_ZERO);
 	}
 
 	@Override
-	abstract public CallResult handleCast(Object message);
+	abstract public CastResult handleCast(Object message);
 
 
-	protected CallResult handleKeepAliveMessage(Side side, KeepAliveMessage mb) {
+	protected CastResult handleKeepAliveMessage(Side side, KeepAliveMessage mb) {
 
 		if (Main.NIO) {
 			if (!channelWrapper.isOpen()) {
@@ -184,7 +188,7 @@ public abstract class UdpCb implements CallBack {
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
-				return result;
+				return castResult;
 			}
 			else {
 				throw new RuntimeException();
@@ -197,7 +201,7 @@ public abstract class UdpCb implements CallBack {
 
 			if (side == Side.UE) {
 				Util.seq(Mode.KEEP_ALIVE, side, Direction.NONE, "dropping keepAlive");
-				return result;
+				return castResult;
 			}
 			else if (side == Side.SP) {
 				// always use outbound proxy
@@ -208,7 +212,7 @@ public abstract class UdpCb implements CallBack {
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
-				return result;
+				return castResult;
 			}
 			else {
 				throw new RuntimeException();
@@ -228,7 +232,7 @@ public abstract class UdpCb implements CallBack {
 		MsgBase mb = (MsgBase)message;
 		if (mb instanceof GetLocalPortMsg) {
 			final int localPort = socket.getLocalPort();
-			return new CallResult(Atom.REPLY, Integer.valueOf(localPort));
+			return new CallResult(Atom.REPLY, Integer.valueOf(localPort), TIMEOUT_ZERO);
 		}
 		else {
 			throw new RuntimeException();
@@ -236,7 +240,7 @@ public abstract class UdpCb implements CallBack {
 	}
 
 	@Override
-	public CallResult handleInfo(Object message) {
+	public InfoResult handleInfo(Object message) {
 		return null;
 	}
 
@@ -257,17 +261,16 @@ public abstract class UdpCb implements CallBack {
 		final byte[] sourceAddr;
 		final Integer sourcePort;
 		final int datagramSize;
+
 		public UdpInfoResult(boolean timedOut, byte[] sourceAddr, Integer sourcePort, int datagramSize) {
 			this.timedOut = timedOut;
 			this.sourceAddr = sourceAddr;
 			this.sourcePort = sourcePort;
 			this.datagramSize = datagramSize;
 		}
-
-
 	}
 
-	protected CallResult udpInit(Side side, byte[] addr, int port) {
+	protected InitResult udpInit(Side side, byte[] addr, int port) {
 
 		if (Main.NIO) {
 			// nio implementation
@@ -313,7 +316,7 @@ public abstract class UdpCb implements CallBack {
 			// 		e.printStackTrace();
 			// 	}
 			// }
-			return result;
+			return new InitResult(Atom.OK, TIMEOUT_ZERO);
 			
 		} else {
 			// legacy implementation
@@ -329,15 +332,15 @@ public abstract class UdpCb implements CallBack {
 					socket.setSoTimeout(Main.SO_TIMEOUT);
 					socket.connect(sa);
 				}
-				return result;
+				return new InitResult(Atom.OK);
 
 			} catch (SocketException e) {
 				e.printStackTrace();
-				return new CallResult(Atom.IGNORE);
+				return new InitResult(Atom.IGNORE);
 
 			} catch (UnknownHostException e) {
 				e.printStackTrace();
-				return new CallResult(Atom.IGNORE);
+				return new InitResult(Atom.IGNORE);
 			}
 		}
 	}

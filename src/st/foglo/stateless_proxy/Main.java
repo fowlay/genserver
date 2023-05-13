@@ -124,7 +124,7 @@ public final class Main {
 
 		// 4. update the proxy with references to (2b) and (3b)
 		
-		px.cast(px, new PortSendersMsg(accessUdp, coreUdp));
+		px.cast(new PortSendersMsg(accessUdp, coreUdp));
 
 		Util.trace(Util.Level.debug, "Main: done init");
 		
