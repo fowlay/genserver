@@ -1,10 +1,10 @@
 package st.foglo.genserver.test;
 
-import st.foglo.genserver.CallBack;
+import st.foglo.genserver.CallBackBase;
 import st.foglo.genserver.GenServer;
 import st.foglo.genserver.Atom;
 
-public final class MyCb2Class implements CallBack {
+public final class MyCb2Class extends CallBackBase {
 	
 	private int count = 0;
 	

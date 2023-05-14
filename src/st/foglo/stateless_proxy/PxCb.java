@@ -3,9 +3,12 @@ package st.foglo.stateless_proxy;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
-import st.foglo.genserver.CallBack;
+import java.util.Set;
+
+import st.foglo.genserver.CallBackBase;
 import st.foglo.genserver.GenServer;
 import st.foglo.genserver.GenServer.CallResult;
 import st.foglo.genserver.GenServer.CastResult;
@@ -14,16 +17,21 @@ import st.foglo.genserver.GenServer.InitResult;
 import st.foglo.stateless_proxy.SipMessage.Method;
 import st.foglo.stateless_proxy.SipMessage.TYPE;
 import st.foglo.stateless_proxy.Util.Direction;
-import st.foglo.stateless_proxy.Util.Level;
 import st.foglo.stateless_proxy.Util.Mode;
 import st.foglo.genserver.Atom;
 
 /**
  * The stateless proxy.
  */
-public final class PxCb implements CallBack {
+public final class PxCb extends CallBackBase {
 
 	private Map<String, SocketAddress> registry = new HashMap<String, SocketAddress>();
+
+    /**
+     * Map of incoming branch parameter to True/False, for registrations/de-registrations
+     * to be performed on successful response
+     */
+    private Map<String, Boolean> pendingRegistrations = new HashMap<String, Boolean>();
 
 	final Map<Side, GenServer> portSenders = new HashMap<Side, GenServer>();
 	final Map<Side, byte[]> listenerAddresses = new HashMap<Side, byte[]>();
@@ -69,7 +77,9 @@ public final class PxCb implements CallBack {
 			portSenders.put(Side.SP, plm.spPortSender);
 
 			return new CastResult(Atom.NOREPLY);
+
 		} else if (mb instanceof KeepAliveMessage) {
+
 			final KeepAliveMessage kam = (KeepAliveMessage) message;
 			final Side side = kam.side;
 
@@ -92,7 +102,6 @@ public final class PxCb implements CallBack {
 			InternalSipMessage ism = (InternalSipMessage) message;
 
 			try {
-
 				final SipMessage sm = ism.message;
 				final Side side = ism.side;
 				final Side otherSide = otherSide(side);
@@ -100,7 +109,7 @@ public final class PxCb implements CallBack {
 
 				if (sm.type == TYPE.request) {
 
-					Util.seq(Mode.SIP, Side.PX, direction(side, otherSide), sm.firstLine);
+					Util.seq(Mode.SIP, Side.PX, direction(side, otherSide), sm.firstLineNoVersion());
 
 					// Max-Forwards
 					final String mf = sm.getTopHeaderField("Max-Forwards");
@@ -108,33 +117,21 @@ public final class PxCb implements CallBack {
 					final int mfValue = Integer.parseInt(mf);
 					sm.setHeaderField("Max-Forwards", String.format("%d", mfValue - 1));
 
-					// Via
-					final String topVia = sm.getTopHeaderField("Via");
-					String topViaBranch = "NOMATCH";
-					for (String u : topVia.split(";")) {
-						if (u.startsWith("branch=")) {
-							topViaBranch = u.substring(u.indexOf('=') + 1);
-						}
-					}
+                    // Statefully save incoming branch parameter
+                    // TODO: potential memory leak
+                    if (method == Method.REGISTER) {
+                        pendingRegistrations.put(sm.getTopViaBranch(), Boolean.valueOf(!sm.isDeRegister()));
+                    }
+
+					// Add a Via header
+                    final String topViaBranch = sm.getTopViaBranch();
 					final byte[] listenerAddress = listenerAddresses.get(otherSide);
 					final Integer localPort = listenerPorts.get(otherSide);
-
 					final String newVia = String.format("SIP/2.0/UDP %s:%s;rport;branch=%s",
 							toDottedAddress(listenerAddress),
 							localPort.intValue(),
 							topViaBranch + "_h8k4c9ne");
 					sm.prepend("Via", newVia);
-
-					// Collect 'user' from REGISTER request
-					// TOXDO: Do this in 200 REGISTER rather
-					if (method == Method.REGISTER) {
-						final String user = sm.getUser();
-						final SocketAddress sa = UdpCb.createSocketAddress(ism.sourceAddr,
-								ism.sourcePort.intValue());
-						Util.seq(Level.debug, Side.PX, Direction.NONE,
-								String.format("registering: %s -> %s", user, sa.toString()));
-						registry.put(user, sa);
-					}
 
 					// Route header field removal from requests
 					if (method == Method.REGISTER ||
@@ -173,6 +170,7 @@ public final class PxCb implements CallBack {
 
 						final SocketAddress sa = registry.get(user);
 						if (sa == null) {
+                            Util.seq(Mode.SIP, Side.PX, Direction.NONE, String.format("unknown: %%s", user));
 							throw new RuntimeException();
 						} else {
 							final byte[] addr = ((InetSocketAddress) sa).getAddress().getAddress();
@@ -187,16 +185,17 @@ public final class PxCb implements CallBack {
 						final Integer port = Main.outgoingProxyPortSp;
 
 						final GenServer gsForward = portSenders.get(otherSide);
-						//Util.trace(Level.verbose, "about to cast: %s", ism.message.toString());
+						//Util.trace(Level.verbose, "about to cast: %s", sm.toString());
                         Util.seq(Mode.SIPDEBUG, side, Direction.NONE, String.format("gsForward thread name is: %s", gsForward.getThread().getName()));
 						gsForward.cast(ism.setDestination(addr, port));
 					}
 
 				} else if (sm.type == TYPE.response) {
 					// a response .. easy, just drop topmost via and use new top via as destination
-					Util.seq(Mode.SIP, Side.PX, direction(side, otherSide), sm.firstLine);
+					Util.seq(Mode.SIP, Side.PX, direction(side, otherSide), sm.responseLabel());
 
 					sm.dropFirst("Via");
+
 					final String topVia = sm.getTopHeaderField("Via");
 					//Util.trace(Level.verbose, "topVia: %s", topVia);
 
@@ -215,37 +214,58 @@ public final class PxCb implements CallBack {
 					//Util.trace(Level.verbose, "destPort: %s", destPort);
 
 
-					// Record-route insertion, for certain responses
-					if (Main.RECORD_ROUTE && ism.side == Side.SP &&
-							(method == Method.INVITE || method == Method.SUBSCRIBE)) {
-						final LinkedList<String> hh = sm.getHeaderFields("Record-Route");
-						final String rrHeaderField = String.format("<sip:%s:%s;lr>",
-								toDottedAddress(Main.sipAddrUe),
-								Main.sipPortUe.intValue());
-						hh.addLast(rrHeaderField);
-						sm.setHeaderFields("Record-Route", hh);
-					}
+		            // Record-route insertion, for certain responses
+                    if (Main.RECORD_ROUTE && ism.side == Side.SP && (method == Method.INVITE || method == Method.SUBSCRIBE)) {
+                        final LinkedList<String> hh = sm.getHeaderFields("Record-Route");
+                        final String rrHeaderField = String.format("<sip:%s:%s;lr>",
+                                toDottedAddress(Main.sipAddrUe),
+                                Main.sipPortUe.intValue());
+                        hh.addLast(rrHeaderField);
+                        sm.setHeaderFields("Record-Route", hh);
+                    }
 
-					// Response to terminating request
-					// remove the RR header field that was added for the benefit of the UE
-					if (Main.RECORD_ROUTE && ism.side == Side.UE && (method == Method.INVITE || method == Method.SUBSCRIBE)) {
-						final String rrHeaderField = String.format("<sip:%s:%s;lr>",
-						    toDottedAddress(Main.sipAddrUe),
-							Main.sipPortUe.intValue());
-						final LinkedList<String> hh = sm.getHeaderFields("Record-Route");
-						hh.remove(rrHeaderField);
-						sm.setHeaderFields("Record-Route", hh);
-					}
+                    // Response to terminating request
+                    // remove the RR header field that was added for the benefit of the UE
+                    if (Main.RECORD_ROUTE && ism.side == Side.UE && (method == Method.INVITE || method == Method.SUBSCRIBE)) {
+                        final String rrHeaderField = String.format("<sip:%s:%s;lr>",
+                                toDottedAddress(Main.sipAddrUe),
+                                Main.sipPortUe.intValue());
+                        final LinkedList<String> hh = sm.getHeaderFields("Record-Route");
+                        hh.remove(rrHeaderField);
+                        sm.setHeaderFields("Record-Route", hh);
+                    }
 
+                    // prepare internal message ready for sending
+                    final InternalSipMessage ismOut = new InternalSipMessage(
+                            ism.side, sm, Integer.valueOf(0), toByteArray(destAddr),
+                            Integer.valueOf(Integer.parseInt(destPort)));
 
-					final GenServer gsForward = portSenders.get(otherSide);
-					gsForward.cast(
-							new InternalSipMessage(
-									ism.side, ism.message, Integer.valueOf(0), toByteArray(destAddr),
-									Integer.valueOf(Integer.parseInt(destPort))));
-				} else {
-					throw new RuntimeException("neither request nor response");
-				}
+                    // finalize REGISTER actions
+                    if (sm.getMethod() == Method.REGISTER) {
+                        final int code = sm.getCode();
+                        if (code >= 200 && code < 300) {
+                            final String branch = sm.getTopViaBranch();
+                            final Boolean regAttempt = pendingRegistrations.get(branch);
+                            pendingRegistrations.remove(branch);
+                            final String user = sm.getUser();
+                            if (regAttempt != null && regAttempt.booleanValue()) {
+                                // REGISTER
+                                registry.put(user, UdpCb.createSocketAddress(ismOut.destAddr, ismOut.destPort));
+                                Util.seq(Mode.DEBUG, Side.PX, Direction.NONE, String.format("registered: %s -> %s:%d", user, Util.bytesToIpAddress(ismOut.destAddr), ismOut.destPort));
+                            } else if (regAttempt != null && !regAttempt.booleanValue()) {
+                                // de-REGISTER
+                                registry.remove(user);
+                                Util.seq(Mode.DEBUG, Side.PX, Direction.NONE, String.format("de-registered: %s", user));
+                            }
+                        }
+                    }
+
+                    final GenServer gsForward = portSenders.get(otherSide);
+
+                    gsForward.cast(ismOut);
+                } else {
+                    throw new RuntimeException("neither request nor response");
+                }
 			} catch (Exception e) {
 				e.printStackTrace();
 			}

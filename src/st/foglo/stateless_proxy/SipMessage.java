@@ -168,8 +168,36 @@ public class SipMessage {
 		return toHeader.substring(posSip+4, posAtSign);
 	}
 	
-	
+	public String firstLineNoVersion() {
+        final String[] parts = firstLine.split(" ");
+        final StringBuilder sb = new StringBuilder();
+        for (String u : parts) {
+            if (!u.equals("SIP/2.0")) {
+                if (sb.length() > 0) {
+                    sb.append(" ");
+                }
+                sb.append(u);
+            }
+        }
+        return sb.toString();
+    }
 
+    public String responseLabel() {
+        final int code = getCode();
+        final Method method = getMethod();
+        final String[] parts = firstLine.split(" ");
+        if (parts.length == 2) {
+            return String.format("%d %s", code, method.toString());
+        }
+        else {
+            final StringBuilder sb = new StringBuilder();
+            for (int j = 2; j < parts.length; j++) {
+                sb.append(" ");
+                sb.append(parts[j]);
+            }
+            return String.format("%d %s%s", code, method.toString(), sb.toString());
+        }
+    }
 
 	public LinkedList<String> getHeaderFields(String key) {
 		final LinkedList<String> toHeaderFields = headers.get(key);
@@ -223,6 +251,60 @@ public class SipMessage {
 			throw new RuntimeException();
 		}
 	}
+
+    public int getCode() {
+        // applicable to responses only
+        // SIP/2.0 401 Unauthorized
+        String[] parts = firstLine.split(" ");
+        return Integer.parseInt(parts[1]);
+    }
+
+
+    /**
+     * Returns true if this request has an Expires: 0 header,
+     * or if there is a single Contact hedaer with expires=0
+     * @return
+     */
+    public boolean isDeRegister() {
+        final LinkedList<String> expiresHeaders = headers.get("Expires");
+        if (expiresHeaders != null && expiresHeaders.size() == 1) {
+            if (expiresHeaders.get(0).equals("0")) {
+                return true;
+            }
+            return false;
+        }
+        else {
+            final LinkedList<String> contactHeaders = headers.get("Contact");
+            if (contactHeaders != null && contactHeaders.size() == 1) {
+                final String[] parts = contactHeaders.get(0).split(";");
+                if (isElement("expires=0", parts)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    public String getTopViaBranch() {
+        final String topVia = getTopHeaderField("Via");
+        for (String u : topVia.split(";")) {
+            if (u.startsWith("branch=")) {
+                return u.substring(u.indexOf('=')+1);
+            }
+        }
+        return "BRANCH_PARAMETER_NOT_FOUND";
+    }
+ 
+    public boolean isElement(String x, String[] a) {
+        for (String u : a) {
+            if (u.equals(x)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+
 
 
 	public void prepend(String key, String headerFieldValue) {

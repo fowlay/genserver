@@ -15,7 +15,7 @@ import st.foglo.stateless_proxy.Util.Mode;
 public final class GenServer implements Runnable {
 
     private final Object[] args;
-    private final CallBack cb;
+    private final CallBackBase cb;
 
     private final Object monitorMessageQueue = new Object();
     private final Queue<GsMessage> messageQueue = new LinkedList<GsMessage>();
@@ -31,9 +31,6 @@ public final class GenServer implements Runnable {
 
     private volatile Thread thread;
     private String threadName = null; // gets assigned when run() is entered
-
-    private volatile boolean isHandlingInfo = false;
-
 
     public static abstract class ResultBase {
 
@@ -55,6 +52,10 @@ public final class GenServer implements Runnable {
             if (!(code == Atom.OK || code == Atom.IGNORE)) {
                 throw new IllegalArgumentException();
             }
+        }
+
+        public String toString() {
+            return String.format("%s, timeout: %d", code.toString(), timeoutMillis);
         }
     }
 
@@ -120,7 +121,7 @@ public final class GenServer implements Runnable {
     }
     
     public GenServer(CallBack cb, Object[] args, int msgLevelIgnoredForNow) {
-        this.cb = cb;
+        this.cb = (CallBackBase) cb;
         this.args = args;
     }
 
@@ -172,21 +173,27 @@ public final class GenServer implements Runnable {
         Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE,
                 String.format("about to insert! - we are using instance: %s %s", threadName,
                         getThread().getName()));
+
         insertMessage(new GsMessage(Atom.CAST, object));
+
         Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE, String.format(
                 "about to MAYBE interrupt! - we are using instance: %s %s", threadName, getThread().getName()));
-        if (accessIsHandlingInfo(false, false)) {
+
+        if (cb.canBeInterrupted()) {
             Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE, "about to interrupt!");
+
+            Thread.yield();
             getThread().interrupt();
+
             Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE, "done interrupt!");
         }
     }
     
     public Object call(GenServer gs, Object object) {
-        // TODO - eliminate the gs argument
 
         insertMessage(new GsMessage(Atom.CALL, object));
-        if (accessIsHandlingInfo(false, false)) {
+
+        if (cb.canBeInterrupted()) {
             getThread().interrupt();
         }
 
@@ -205,6 +212,7 @@ public final class GenServer implements Runnable {
         }
     }
     
+
     @Override
     public void run() {
         
@@ -257,11 +265,6 @@ public final class GenServer implements Runnable {
                             }
 
                             GsMessage message = new GsMessage(Atom.TIMEOUT, null);
-                           
-                            accessIsHandlingInfo(true, true);
-
-                            Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE,
-                                String.format("%s isHandlingInfo is: %b", Thread.currentThread().getName(), accessIsHandlingInfo(false, false)));
                             
                             InfoResult crInfo = null;
                             try {
@@ -269,11 +272,6 @@ public final class GenServer implements Runnable {
                             } catch (Exception e) {
                                 e.printStackTrace();
                             }
-
-                            accessIsHandlingInfo(true, false);
-
-			                Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE,
-                                String.format("%s isHandlingInfo is: %b", Thread.currentThread().getName(), accessIsHandlingInfo(false, false)));
                                 
                             if (crInfo.code == Atom.STOP) {
                                 try {
@@ -391,21 +389,6 @@ public final class GenServer implements Runnable {
         Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE, "insertMessage 3");
     }
 
-    public synchronized boolean accessIsHandlingInfo(boolean update, boolean value) {
-        if (update) {
-            final boolean oldValue = isHandlingInfo;
-            isHandlingInfo = value;
-            Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE,
-                String.format("%s isHandlingInfo: %b -> %b%n", threadName, oldValue, isHandlingInfo));
-            return oldValue;
-        }
-        else {
-	        Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE,
-                String.format("%s isHandlingInfo: value retrieved: %b", threadName, isHandlingInfo));
-            return isHandlingInfo;
-        }
-    }
-    
     public Thread getThread() {
         return thread;
     }

@@ -141,6 +141,56 @@ GenServer?
 
 -----------------------------------------
 
+DONE: Remove the Interrupter class.
+
+-------------------------------------------
+
+GenServer: Make the "interrupt" action a specifically enabled
+feature. This is hardly needed if the cooperative model below is
+implemented.
+
+-----------------------------------------
+
+DONE: Remove the Interrupter class.
+
+------------------------------------------
+
+DONE: GenServer: Improve the use of interrupt. Introduce a base class
+CallBackBase that all behavior classes have to extend.
+
+The base class holds avolatile variable by which the callback module
+can cooperatively indicate that the GenServer process is prepared to
+be interrupted. Accessor functions for this variable shall be
+provided. Note the need to call Thread.interrupted() when leaving the
+interruptable section. Also don't forget that reading from the UDP
+socket is not always interrupted; in case of successful reading of a
+datagram the indication has to be ceased.
+
+------------------------------------------
+
+DONE: Clear out the java.net based implementation.
+
+-----------------------------------------
+
+DONE: Tracing SIP requests: Drop the SIP/2.0 part
+
+---------------------------------------------
+
+DONE: Registry correction: The registry should be updated only on a 2xx
+REGISTER response.
+
+---------------------------------------------
+
+DONE: On de-REGISTER, clear the registry entry. Implies transaction
+statefulness.
+
+-----------------------------------------
+
+DONE: Tracing SIP responses: Show code and CSeq method, plus the
+free-text part appended
+
+-----------------------------------------
+
 GenServer: Should the handleInfo method be renamed, or keep it for
 Erlang similarity?
 
@@ -155,37 +205,8 @@ GenServer: Has the concept been implemented already?
 
 ----------------------------------
 
-GenServer: The package must not have external dependencies.
-
--------------------------------------------
-
-GenServer: Make the "interrupt" action a specifically enabled
-feature. This is hardly needed if the cooperative model below is
-implemented.
-
------------------------------------------
-
-Remove the Interrupter class. Or keep it, as configurable option?
-
-------------------------------------------
-
-GenServer: Improve the use of interrupt. Introduce a subclass of
-java.lang.Thread (GenServerThread), holding a volatile variable by
-which the callback module can cooperatively tell the GenServer process
-that it is prepared to be interrupted. Accessor functions for this
-variable shall be provided in GenServerThread. Note the need to call
-Thread.interrupted() when leaving the interruptable section.
-
-------------------------------------------
-
-Clear out the java.net based implementation
-
----------------------------------------------
-
-Registry correction: The registry should be updated only on a 2xx
-REGISTER response.
-
-On de-REGISTER, clear the registry entry (expensive).
+GenServer: The package must not have external dependencies. Watch out
+for imports from Util.
 
 -------------------------------------
 
@@ -238,14 +259,6 @@ exception in case of bad shape.
 Implementation of GenServer "call": Is there a complication when
 several calls are executed in sequence and corresponding results are
 to be collected? Maybe not? Or?
-
------------------------------------------
-
-Tracing SIP responses: Maybe just show code and CSeq method?
-
------------------------------------------
-
-Tracing SIP requests: Maybe drop the SIP/2.0 part?
 
 -----------------------------------------
 

@@ -1,13 +1,13 @@
 package st.foglo.genserver.test;
 
-import st.foglo.genserver.CallBack;
+import st.foglo.genserver.CallBackBase;
 import st.foglo.genserver.GenServer.CallResult;
 import st.foglo.genserver.GenServer.CastResult;
 import st.foglo.genserver.GenServer.InfoResult;
 import st.foglo.genserver.GenServer.InitResult;
 import st.foglo.genserver.Atom;
 
-public final class MyCb3Class implements CallBack {
+public final class MyCb3Class extends CallBackBase {
 	
 	public class Product {
 		public final int product;

@@ -45,13 +45,16 @@ public final class AccessUdpCb extends UdpCb {
 		if (mb instanceof KeepAliveMessage) {
 			final CastResult result = handleKeepAliveMessage(side, (KeepAliveMessage)mb);
 			return result;
+
 		} else if (mb instanceof InternalSipMessage) {
+
 			final InternalSipMessage ism = (InternalSipMessage) message;
 			final SipMessage sm = ism.message;
 			if (sm.type == TYPE.request) {
-				Util.seq(Mode.SIP, side, Direction.OUT, sm.firstLine);
-			} else if (sm.type == TYPE.response) {
-				Util.seq(Mode.SIP, side, Direction.OUT, sm.firstLine);
+				Util.seq(Mode.SIP, side, Direction.OUT, sm.firstLineNoVersion());
+			}
+            else if (sm.type == TYPE.response) {
+				Util.seq(Mode.SIP, side, Direction.OUT, sm.responseLabel());
 			}
 
 			// TOXDO ... maybe return an indication of success/failure?
@@ -100,7 +103,13 @@ public final class AccessUdpCb extends UdpCb {
 						null,
 						sourceAddr,
 						sourcePort);
-				Util.seq(Mode.SIP, side, Direction.IN, sipMessage.firstLine);
+
+                if (sipMessage.type == TYPE.request) {
+                    Util.seq(Mode.SIP, side, Direction.IN, sipMessage.firstLineNoVersion());
+                } else if (sipMessage.type == TYPE.response) {
+                    Util.seq(Mode.SIP, side, Direction.IN, sipMessage.responseLabel());
+                }
+
 				proxy.cast(iMsg);
 			}
 		} catch (Exception e) {

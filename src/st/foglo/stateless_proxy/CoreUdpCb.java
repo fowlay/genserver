@@ -5,6 +5,7 @@ import st.foglo.genserver.GenServer.InfoResult;
 import st.foglo.genserver.GenServer.InitResult;
 import st.foglo.genserver.Atom;
 import st.foglo.genserver.GenServer;
+import st.foglo.stateless_proxy.SipMessage.TYPE;
 import st.foglo.stateless_proxy.Util.Direction;
 import st.foglo.stateless_proxy.Util.Mode;
 
@@ -40,16 +41,22 @@ public class CoreUdpCb extends UdpCb {
 	public CastResult handleCast(Object message) {
 		MsgBase mb = (MsgBase) message;
 		if (mb instanceof KeepAliveMessage) {
+
 			final CastResult result = handleKeepAliveMessage(side, (KeepAliveMessage)mb);
 			return result;
+
 		} else if (mb instanceof InternalSipMessage) {
 
 			final InternalSipMessage ism = (InternalSipMessage) mb;
-			//Util.trace(Level.verbose, "%s send a forwarded message: castCount: %d%n%s", side.toString(), castCount, ism.message.toString());
-			Util.seq(Mode.SIP, side, Direction.OUT, ism.message.firstLine);
+
+            if (ism.message.type == TYPE.request) {
+                Util.seq(Mode.SIP, side, Direction.OUT, ism.message.firstLineNoVersion());
+            } else if (ism.message.type == TYPE.response) {
+                Util.seq(Mode.SIP, side, Direction.OUT, ism.message.responseLabel());
+            }
+
 			// if the message comes with destination info, then use it,
 			// else use outbound proxy
-
 			udpCast(side, ism);
 
 			return new CastResult(Atom.NOREPLY, TIMEOUT_ZERO);
@@ -88,7 +95,12 @@ public class CoreUdpCb extends UdpCb {
 					Util.digest(recBuffer, udpInfoResult.datagramSize),
 					null,
 					null);
-			Util.seq(Mode.SIP, side, Direction.IN, sipMessage.firstLine);
+            if (sipMessage.type == TYPE.request) {
+                Util.seq(Mode.SIP, side, Direction.IN, sipMessage.firstLineNoVersion());
+            } else if (sipMessage.type == TYPE.response) {
+                Util.seq(Mode.SIP, side, Direction.IN, sipMessage.responseLabel());
+            }
+
 			proxy.cast(iMsg);
 		}
 
