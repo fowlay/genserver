@@ -2,6 +2,8 @@ package st.foglo.genserver;
 
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import st.foglo.stateless_proxy.Side;
 import st.foglo.stateless_proxy.Util;
@@ -13,6 +15,13 @@ import st.foglo.stateless_proxy.Util.Mode;
  * the CallBack interface.
  */
 public final class GenServer implements Runnable {
+
+    /**
+     * Named GenServer processes.
+     */
+    public static final ConcurrentMap<String, GenServer> registry = new ConcurrentHashMap<String, GenServer>();
+
+    private final String name;
 
     private final Object[] args;
     private final CallBackBase cb;
@@ -116,41 +125,36 @@ public final class GenServer implements Runnable {
 
     //////////////////////////////////////////////////////////
 
-    public GenServer(CallBack cb, Object[] args) {
-        this(cb, args, 0);
+    public GenServer(CallBack cb, String name, Object[] args) {
+        this(cb, name, args, 0);
     }
     
-    public GenServer(CallBack cb, Object[] args, int msgLevelIgnoredForNow) {
+    public GenServer(CallBack cb, String name, Object[] args, int msgLevelIgnoredForNow) {
         this.cb = (CallBackBase) cb;
+        this.name = name;
         this.args = args;
     }
 
-    /**
-     * Start an anonymous GenServer process.
-     */
-    public static GenServer start(CallBack cb, Object[] args) {
-        try {
-            // Using system clock for thread name; ensure uniqueness
-            // by waiting briefly; TODO something better
-            Thread.sleep(50);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        return start(cb, args, String.format("%d", System.currentTimeMillis()));
-    }
-    
+
     public static GenServer start(CallBack cb, Object[] args, String name) {
-        return start(cb, args, name, -1);
+        return start(cb, args, name, false);
     }
-    
-    public static GenServer start(CallBack cb, Object[] args, String name, int trace) {
-        final GenServer gs = new GenServer(cb, args, trace);
+
+    public static GenServer start(CallBack cb, Object[] args, String name, boolean register) {
+        return start(cb, args, name, register, -1);
+    }
+   
+    public static GenServer start(CallBack cb, Object[] args, String name, boolean register, int trace) {
+        final GenServer gs = new GenServer(cb, name, args, trace);
         final Thread thread = new Thread(gs, name);
         thread.start();
         gs.waitForInit();
+        if (register) {
+            registry.put(name, gs);
+        }
         return gs;
     }
-    
+
     private void waitForInit() {
         for (; true; ) {
             synchronized (monitorInitialized) {
@@ -276,6 +280,7 @@ public final class GenServer implements Runnable {
                             if (crInfo.code == Atom.STOP) {
                                 try {
                                     cb.handleTerminate();
+                                    registry.remove(name);
                                 }
                                 catch (Exception e) {
                                     e.printStackTrace();
@@ -322,6 +327,7 @@ public final class GenServer implements Runnable {
                     if (kcr.code == Atom.STOP) {
                         try {
                             cb.handleTerminate();
+                            registry.remove(name);
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
@@ -354,6 +360,7 @@ public final class GenServer implements Runnable {
                     if (ccr.code == Atom.STOP) {
                         try {
                             cb.handleTerminate();
+                            registry.remove(name);
                         }
                         catch (Exception e) {
                             e.printStackTrace();

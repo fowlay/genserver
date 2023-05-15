@@ -7,7 +7,6 @@ public final class Main {
 	
 	public static final Util.Level traceLevel = Util.Level.verbose;
 
-
     public static final Mode[] TRACE_MODES = new Mode[]{
         // Mode.DEBUG,
         //Mode.KEEP_ALIVE,
@@ -41,100 +40,38 @@ public final class Main {
 
 	/////////////////////////////////
 
+    public static void main(String[] args) {
 
-	public static void main(String[] args) {
+        final GenServer px = GenServer.start(
+                new PxCb(sipAddrUe, sipPortUe, sipAddrSp, sipPortSp),
+                new Object[] {}, // TODO, just pass null
+                "proxy",
+                true);
 
-		// Create proxy
+        GenServer.start(
+                new AccessUdpCb(Side.UE, px, sipAddrUe, sipPortUe.intValue()),
+                new Object[] {}, // TODO, pass null simply
+                "access-UDP",
+                true);
 
-		// final String ldt = LocalDateTime.now().toString();
+        Util.trace(Util.Level.verbose, "Started access-UDP");
 
-		// Util.trace(Level.verbose, "ldt string: %s", ldt);
+        GenServer.start(
+                new CoreUdpCb(Side.SP, px, sipAddrSp, sipPortSp, outgoingProxyAddrSp, outgoingProxyPortSp),
+                new Object[] {},
+                "core-UDP",
+                true);
 
-		// Util.trace(Level.verbose, "refined string: %s", Util.ldt());
+        Util.trace(Util.Level.verbose, "Started core-UDP");
 
-		final GenServer px = GenServer.start(
-				new PxCb(sipAddrUe, sipPortUe, sipAddrSp, sipPortSp),
-				new Object[]{},  // TODO, just pass null
-				"proxy",
-                1);
+        Util.trace(Util.Level.debug, "Main: done init");
 
-		
-		
-		// microSIP special support: Let the port listener know about the port sender
-		
-		// 2b. create the UE port sender
-		
-		// we are not a registrar, so we use outbound proxy pointing to the UE
-//		final GenServer uePs = GenServer.start(
-//				new PsCb(Side.UE, px, outgoingProxyAddrUe, outgoingProxyPortUe),
-//				new Object[]{},
-//				"UE-sender");
-		
-		
-		
-
-		// 2a. create the UE port listener
-
-//		GenServer.start(
-//				new PlCb(Side.UE, px, sipAddrUe, sipPortUe, uePs),
-//				new Object[] {},
-//				"UE-listener");
-		
-
-		// 3b. create the SP port sender
-		
-//		GenServer spPs =
-//				GenServer.start(
-//				new PsCb(Side.SP, px, outgoingProxyAddrSp, outgoingProxyPortSp),
-//				new Object[]{},
-//				"SP-sender");
-		
-		
-		final GenServer accessUdp =
-				GenServer.start(
-				new AccessUdpCb(Side.UE, px, sipAddrUe, sipPortUe.intValue()),
-				new Object[]{},                   // TODO, pass null simply
-				"access-UDP");
-
-		Util.trace(Util.Level.verbose, "Started access-UDP");
-		
-		
-		final GenServer coreUdp =
-				GenServer.start(
-				new CoreUdpCb(Side.SP, px, sipAddrSp, sipPortSp, outgoingProxyAddrSp, outgoingProxyPortSp),
-				new Object[]{},
-				"core-UDP",
-                0);
-
-				Util.trace(Util.Level.verbose, "Started core-UDP");
-
-
-		// 3a. create the SP port listener
-		// actually not needed!
-
-//		if (NEVER) {
-//			GenServer.start(
-//					new PlCb(Side.SP, px, sipAddrSp, sipPortSp, spPs),
-//					new Object[] {},
-//					"SP-listener");
-//		}
-		
-		
-
-		
-
-		// 4. update the proxy with references to (2b) and (3b)
-		
-		px.cast(new PortSendersMsg(accessUdp, coreUdp));
-
-		Util.trace(Util.Level.debug, "Main: done init");
-		
-        for (; true; ) {
+        for (; true;) {
             try {
                 Thread.sleep(3600000);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
         }
-	}
+    }
 }

@@ -189,6 +189,24 @@ statefulness.
 DONE: Tracing SIP responses: Show code and CSeq method, plus the
 free-text part appended
 
+------------------------------------
+
+DONE: GenServer: Process registry: A static ConcurrentHashMap in
+GenServer. A "name" variety of the GenServer.start method. Ensure that
+processes remove themselves from the map upon termination.
+
+-----------------------------------------
+
+Subscriber view: Driven by events reported by the proxy:
+  registration
+  de-registration
+  notification from SP
+  originating call
+  terminating call
+  call length
+
+Introduce a new GenServer for this.
+
 -----------------------------------------
 
 GenServer: Should the handleInfo method be renamed, or keep it for
@@ -240,19 +258,6 @@ Blacklisting: Blacklisted patterns from file?
 --------------------------------------
 
 GenServer: There should be some principle of fault handling.
-
-------------------------------------
-
-GenServer: Process registry: A static HashMap (ConcurrentHashMap?) in
-GenServer. A "name" variety of the GenServer.start method. The names
-can be strings or enums or Integers, so let the type of the map be
-Map<Object, GenServer>
-
-Ensure that processes remove themselves from the map upon termination.
-
-The GenServer.call and .cast methods shall understand how to look up
-process by name. Maybe also check validity of the process, throwing an
-exception in case of bad shape.
 
 ---------------------------------------
 

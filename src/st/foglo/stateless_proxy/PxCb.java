@@ -3,11 +3,8 @@ package st.foglo.stateless_proxy;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
-import java.util.Set;
-
 import st.foglo.genserver.CallBackBase;
 import st.foglo.genserver.GenServer;
 import st.foglo.genserver.GenServer.CallResult;
@@ -36,6 +33,31 @@ public final class PxCb extends CallBackBase {
 	final Map<Side, GenServer> portSenders = new HashMap<Side, GenServer>();
 	final Map<Side, byte[]> listenerAddresses = new HashMap<Side, byte[]>();
 	final Map<Side, Integer> listenerPorts = new HashMap<Side, Integer>();
+
+
+
+    private GenServer getPortsender(Side side) {
+        for (; true; ) {
+
+            final GenServer gs = portSenders.get(side);
+            if (gs != null) {
+                return gs;
+            }
+            else {
+                final String key = side == Side.UE ? "access-UDP" : side == Side.SP ? "core-UDP" : "badkey";
+                final GenServer newGs = GenServer.registry.get(key);
+
+                if (newGs != null) {
+                    portSenders.put(side, newGs);
+                    return newGs;
+                }
+                else {
+                    Thread.yield();
+                }
+            }
+        }
+    }
+
 
 	public PxCb(byte[] sipAddrUe, Integer sipPortUe, byte[] sipAddrSp, Integer sipPortSp) {
 
@@ -67,18 +89,8 @@ public final class PxCb extends CallBackBase {
 	public CastResult handleCast(Object message) {
 
 		MsgBase mb = (MsgBase) message;
-		if (mb instanceof PortSendersMsg) {
-
-			Util.seq(Mode.START, Side.PX, Util.Direction.NONE, "proxy getting port processes");
-
-			PortSendersMsg plm = (PortSendersMsg) mb;
-
-			portSenders.put(Side.UE, plm.uePortSender);
-			portSenders.put(Side.SP, plm.spPortSender);
-
-			return new CastResult(Atom.NOREPLY);
-
-		} else if (mb instanceof KeepAliveMessage) {
+        
+        if (mb instanceof KeepAliveMessage) {
 
 			final KeepAliveMessage kam = (KeepAliveMessage) message;
 			final Side side = kam.side;
@@ -90,7 +102,7 @@ public final class PxCb extends CallBackBase {
             else {
                 final Side otherSide = otherSide(side);
                 Util.seq(Mode.KEEP_ALIVE, Side.PX, direction(side, otherSide), mb.toString());
-                GenServer gsForward = portSenders.get(otherSide);
+                GenServer gsForward = getPortsender(otherSide);
                 gsForward.cast(kam);
                 return new CastResult(Atom.NOREPLY);
             }
@@ -175,7 +187,7 @@ public final class PxCb extends CallBackBase {
 						} else {
 							final byte[] addr = ((InetSocketAddress) sa).getAddress().getAddress();
 							final Integer port = Integer.valueOf(((InetSocketAddress) sa).getPort());
-							final GenServer gsForward = portSenders.get(otherSide);
+							final GenServer gsForward = getPortsender(otherSide);
 							gsForward.cast(ism.setDestination(addr, port));
 						}
 					} else if (otherSide == Side.SP) {
@@ -184,7 +196,7 @@ public final class PxCb extends CallBackBase {
 						final byte[] addr = Main.outgoingProxyAddrSp;
 						final Integer port = Main.outgoingProxyPortSp;
 
-						final GenServer gsForward = portSenders.get(otherSide);
+						final GenServer gsForward = getPortsender(otherSide);
 						//Util.trace(Level.verbose, "about to cast: %s", sm.toString());
                         Util.seq(Mode.SIPDEBUG, side, Direction.NONE, String.format("gsForward thread name is: %s", gsForward.getThread().getName()));
 						gsForward.cast(ism.setDestination(addr, port));
@@ -260,7 +272,7 @@ public final class PxCb extends CallBackBase {
                         }
                     }
 
-                    final GenServer gsForward = portSenders.get(otherSide);
+                    final GenServer gsForward = getPortsender(otherSide);
 
                     gsForward.cast(ismOut);
                 } else {
