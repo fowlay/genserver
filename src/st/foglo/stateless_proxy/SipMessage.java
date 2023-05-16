@@ -1,13 +1,12 @@
 package st.foglo.stateless_proxy;
 
+import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.ConcurrentMap;
 
 
-public class SipMessage {
+public class SipMessage implements Cloneable {
 
 	public enum Method {
 		REGISTER,
@@ -31,10 +30,10 @@ public class SipMessage {
 	 * 
 	 * Values are lists of as-received strings, no CR LF at end
 	 */
-	private final ConcurrentMap<String, ConcurrentLinkedDeque<String>> headers =
-        new ConcurrentHashMap<String, ConcurrentLinkedDeque<String>>();
+	private Map<String, LinkedList<String>> headers =
+        new HashMap<String, LinkedList<String>>();
 
-    // public ConcurrentMap<String, ConcurrentLinkedDeque<String>> getHeaders() {
+    // public Map<String, LinkedList<String>> getHeaders() {
     //     return headers;
     // }
 	
@@ -118,6 +117,35 @@ public class SipMessage {
 
 	}
 
+    //////////////////////////
+
+    public Object clone() {
+        try {
+            final Object result = (SipMessage)super.clone();
+            ((SipMessage)result).headers = copyMap(((SipMessage)result).headers);
+            return result;
+        } catch (CloneNotSupportedException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private static Map<String, LinkedList<String>> copyMap(Map<String, LinkedList<String>> map) {
+        Map<String, LinkedList<String>> result = new HashMap<String,LinkedList<String>>();
+        for (Entry<String, LinkedList<String>> e : map.entrySet()) {
+            result.put(e.getKey(), copyList(e.getValue()));
+        }
+        return result;
+    }
+
+    private static LinkedList<String> copyList(LinkedList<String> list) {
+        LinkedList<String> result = new LinkedList<String>();
+        for (String s : list) {
+            result.add(s);
+        }
+        return result;
+    }
+
 	
 	////////////////////////
 	
@@ -127,13 +155,13 @@ public class SipMessage {
 		String key = headerLine.substring(0, indexColon);
 		
 		if (headers.get(key) == null) {
-			ConcurrentLinkedDeque<String> hh = new ConcurrentLinkedDeque<String>();
+			LinkedList<String> hh = new LinkedList<String>();
 			hh.add(headerLine.substring(1+indexColon).trim());
 			headers.put(key, hh);
 			//Util.trace(Level.verbose, "+++ %s -> %s", key, headerLine);
 		}
 		else {
-			ConcurrentLinkedDeque<String> hh = headers.get(key);
+			LinkedList<String> hh = headers.get(key);
 			hh.add(headerLine.substring(1+indexColon).trim());
 			//Util.trace(Level.verbose, "+++ %s -> %s", key, headerLine);
 		}
@@ -145,8 +173,8 @@ public class SipMessage {
 		sb.append(firstLine);
 		sb.append(Character.valueOf((char) crLf[1]));
 		
-		for (Entry<String, ConcurrentLinkedDeque<String>> me : headers.entrySet()) {
-			final ConcurrentLinkedDeque<String> hh = me.getValue();
+		for (Entry<String, LinkedList<String>> me : headers.entrySet()) {
+			final LinkedList<String> hh = me.getValue();
 			final String key = me.getKey();
 			for (String s : hh) {
 				sb.append(key);
@@ -203,10 +231,10 @@ public class SipMessage {
         }
     }
 
-	public ConcurrentLinkedDeque<String> getHeaderFields(String key) {
-		final ConcurrentLinkedDeque<String> toHeaderFields = headers.get(key);
+	public LinkedList<String> getHeaderFields(String key) {
+		final LinkedList<String> toHeaderFields = headers.get(key);
 		if (toHeaderFields == null) {
-			return new ConcurrentLinkedDeque<String>();
+			return new LinkedList<String>();
 		}
 		else {
 			return toHeaderFields;
@@ -220,7 +248,7 @@ public class SipMessage {
 	 * @return The topmost header field value
 	 */
 	public String getTopHeaderField(String key) {
-		final ConcurrentLinkedDeque<String> fields = getHeaderFields(key);
+		final LinkedList<String> fields = getHeaderFields(key);
 		if (fields.isEmpty()) {
 			return null;
 		}
@@ -241,7 +269,7 @@ public class SipMessage {
 			throw new RuntimeException();
 		}
 		else if (type == TYPE.response) {
-			final ConcurrentLinkedDeque<String> hh = getHeaderFields("CSeq");
+			final LinkedList<String> hh = getHeaderFields("CSeq");
 			final String[] words = hh.peek().split(" ");
 			final String word = words[words.length - 1];
 			for (Method m : Method.values()) {
@@ -264,7 +292,7 @@ public class SipMessage {
     }
 
     // public String getFromTag() {
-    //     final ConcurrentLinkedDeque<String> fromTags = headers.get("From");
+    //     final LinkedList<String> fromTags = headers.get("From");
     //     if (fromTags == null || fromTags.size() != 1) {
     //         throw new RuntimeException();
     //     }
@@ -280,7 +308,7 @@ public class SipMessage {
     // }
 
     public String getTag(String key) {
-        final ConcurrentLinkedDeque<String> tags = headers.get(key);
+        final LinkedList<String> tags = headers.get(key);
         if (tags == null || tags.size() != 1) {
             throw new RuntimeException();
         }
@@ -302,7 +330,7 @@ public class SipMessage {
      * @return
      */
     public boolean isDeRegister() {
-        final ConcurrentLinkedDeque<String> expiresHeaders = headers.get("Expires");
+        final LinkedList<String> expiresHeaders = headers.get("Expires");
         if (expiresHeaders != null && expiresHeaders.size() == 1) {
             if (expiresHeaders.peek().equals("0")) {
                 return true;
@@ -310,7 +338,7 @@ public class SipMessage {
             return false;
         }
         else {
-            final ConcurrentLinkedDeque<String> contactHeaders = headers.get("Contact");
+            final LinkedList<String> contactHeaders = headers.get("Contact");
             if (contactHeaders != null && contactHeaders.size() == 1) {
                 final String[] parts = contactHeaders.peek().split(";");
                 if (isElement("expires=0", parts)) {
@@ -344,14 +372,14 @@ public class SipMessage {
 
 
 	public void prepend(String key, String headerFieldValue) {
-		ConcurrentLinkedDeque<String> headerFields = getHeaderFields(key);
+		LinkedList<String> headerFields = getHeaderFields(key);
         headerFields.addFirst(headerFieldValue);
 	}
 
     
 
 	public void dropFirst(String key) {
-		final ConcurrentLinkedDeque<String> hh = getHeaderFields(key);
+		final LinkedList<String> hh = getHeaderFields(key);
 		hh.poll();
 		if (hh.isEmpty()) {
 			headers.remove(key);
@@ -365,12 +393,12 @@ public class SipMessage {
 	 * @param key
 	 * @param headerFields
 	 */
-	public void setHeaderFields(String key, ConcurrentLinkedDeque<String> headerFields) {
+	public void setHeaderFields(String key, LinkedList<String> headerFields) {
 		headers.put(key, headerFields);
 	}
 
 	public void setHeaderField(String key, String headerField) {
-		final ConcurrentLinkedDeque<String> headerFields = new ConcurrentLinkedDeque<String>();
+		final LinkedList<String> headerFields = new LinkedList<String>();
 		headerFields.add(headerField);
 		setHeaderFields(key, headerFields);
 	}
@@ -387,7 +415,7 @@ public class SipMessage {
 		ba[k++] = 13;
 		ba[k++] = 10;
 
-		for (Map.Entry<String, ConcurrentLinkedDeque<String>> e : headers.entrySet()) {
+		for (Map.Entry<String, LinkedList<String>> e : headers.entrySet()) {
 			final String key = e.getKey();
 			for (String h : e.getValue()) {
 				for (byte b : key.getBytes()) {

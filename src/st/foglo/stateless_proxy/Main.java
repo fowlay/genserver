@@ -9,7 +9,7 @@ public final class Main {
 
     public static final Mode[] TRACE_MODES = new Mode[]{
         // Mode.DEBUG,
-        //Mode.KEEP_ALIVE,
+        // Mode.KEEP_ALIVE,
         Mode.START,
         Mode.SIP
     };

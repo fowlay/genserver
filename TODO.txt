@@ -201,6 +201,12 @@ DONE: Eliminate unused field in InternalSipMessage
 
 -----------------------------------------
 
+DONE: Deep clone of InternalSipMessage made before casting from proxy
+to other GenServers. Single-threaded HashMap and LinkedList can
+therefore be used in the wrapped SipMessage.
+
+-----------------------------------------
+
 Presenter: Driven by events reported by the proxy:
   registration
   de-registration
@@ -210,9 +216,7 @@ Presenter: Driven by events reported by the proxy:
   call length
   blocked call
 
-Introduce a new GenServer for this. Switch to using thread-safe
-alternatives to HashMap and LinkedList, since a SIP message may be
-accessed by the proxy and the presenter in parallel.
+Introduce a new GenServer that cannot affect proxy processing.
 
 -----------------------------------------
 

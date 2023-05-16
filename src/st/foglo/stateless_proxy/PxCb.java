@@ -3,8 +3,8 @@ package st.foglo.stateless_proxy;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Map;
-import java.util.concurrent.ConcurrentLinkedDeque;
 import st.foglo.genserver.CallBackBase;
 import st.foglo.genserver.GenServer;
 import st.foglo.genserver.GenServer.CallResult;
@@ -141,11 +141,11 @@ public final class PxCb extends CallBackBase {
                     if (method == Method.INVITE && SipMessage.isElement(fromUser, blackList.blackList)) {
                         ism.setBlocked(true);
                         Util.seq(Mode.SIP, Side.PX, Direction.NONE, String.format("blacklisted: %s", fromUser));
-                        presenter.cast(ism);
+                        presenter.cast((InternalSipMessage)ism.clone());
                         return new CastResult(Atom.NOREPLY, TIMEOUT_NEVER);
                     }
 
-                    presenter.cast(ism);
+                    presenter.cast((InternalSipMessage)ism.clone());
 
 					// Max-Forwards
 					final String mf = sm.getTopHeaderField("Max-Forwards");
@@ -176,7 +176,7 @@ public final class PxCb extends CallBackBase {
 							method == Method.BYE ||
 							method == Method.INVITE ||
 							method == Method.SUBSCRIBE) {
-						final ConcurrentLinkedDeque<String> hh = sm.getHeaderFields("Route");
+						final LinkedList<String> hh = sm.getHeaderFields("Route");
 						if (!hh.isEmpty()) {
 							final String topRoute = hh.peek();
 							final int indexOfSipColon = topRoute.indexOf("sip:");
@@ -192,7 +192,7 @@ public final class PxCb extends CallBackBase {
 					// Terminating request
 					// this finalizes the route set for the UE
 					if (Main.RECORD_ROUTE && ism.side == Side.SP && (method == Method.INVITE || method == Method.SUBSCRIBE)) {
-						final ConcurrentLinkedDeque<String> hh = sm.getHeaderFields("Record-Route");
+						final LinkedList<String> hh = sm.getHeaderFields("Record-Route");
 						final String rrHeaderField = String.format("<sip:%s:%s;lr>",
 						    toDottedAddress(Main.sipAddrUe),
 							Main.sipPortUe.intValue());
@@ -233,7 +233,7 @@ public final class PxCb extends CallBackBase {
 
 				} else if (type == TYPE.response) {
 
-                    presenter.cast(ism);
+                    presenter.cast((InternalSipMessage)ism.clone());
 
 					// a response .. easy, just drop topmost via and use new top via as destination
 					Util.seq(Mode.SIP, Side.PX, direction(side, otherSide), sm.responseLabel());
@@ -260,7 +260,7 @@ public final class PxCb extends CallBackBase {
 
 		            // Record-route insertion, for certain responses
                     if (Main.RECORD_ROUTE && ism.side == Side.SP && (method == Method.INVITE || method == Method.SUBSCRIBE)) {
-                        final ConcurrentLinkedDeque<String> hh = sm.getHeaderFields("Record-Route");
+                        final LinkedList<String> hh = sm.getHeaderFields("Record-Route");
                         final String rrHeaderField = String.format("<sip:%s:%s;lr>",
                                 toDottedAddress(Main.sipAddrUe),
                                 Main.sipPortUe.intValue());
@@ -274,7 +274,7 @@ public final class PxCb extends CallBackBase {
                         final String rrHeaderField = String.format("<sip:%s:%s;lr>",
                                 toDottedAddress(Main.sipAddrUe),
                                 Main.sipPortUe.intValue());
-                        final ConcurrentLinkedDeque<String> hh = sm.getHeaderFields("Record-Route");
+                        final LinkedList<String> hh = sm.getHeaderFields("Record-Route");
                         hh.remove(rrHeaderField);
                         sm.setHeaderFields("Record-Route", hh);
                     }

@@ -1,10 +1,10 @@
 package st.foglo.stateless_proxy;
 
-public final class InternalSipMessage extends MsgBase {
+public final class InternalSipMessage extends MsgBase implements Cloneable {
 	
 
 	public final Side side;            // the side where this message entered the proxy
-	final SipMessage message;
+	public SipMessage message;
 	
 	final byte[] destAddr;
 	final Integer destPort;
@@ -51,6 +51,22 @@ public final class InternalSipMessage extends MsgBase {
 
 	
 	/////////////////////////
+
+
+    public Object clone() {
+
+        try {
+            final Object result = super.clone();
+            ((InternalSipMessage)result).message =
+                (SipMessage) ((InternalSipMessage)result).message.clone();
+            return result;
+        } catch (CloneNotSupportedException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    //////////////////////////////
 	
 	public InternalSipMessage setDestination(byte[] addr, Integer port) {
 		return new InternalSipMessage(side, message, addr, port);
