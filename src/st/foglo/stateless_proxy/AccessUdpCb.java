@@ -98,7 +98,6 @@ public final class AccessUdpCb extends UdpCb {
 				final InternalSipMessage iMsg = new InternalSipMessage(
 						side,
 						sipMessage,
-						Util.digest(recBuffer, udpInfoResult.datagramSize),
 						null,
 						null,
 						sourceAddr,

@@ -92,7 +92,6 @@ public class CoreUdpCb extends UdpCb {
 			final InternalSipMessage iMsg = new InternalSipMessage(
 					side,
 					sipMessage,
-					Util.digest(recBuffer, udpInfoResult.datagramSize),
 					null,
 					null);
             if (sipMessage.type == TYPE.request) {

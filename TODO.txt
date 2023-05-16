@@ -197,15 +197,22 @@ processes remove themselves from the map upon termination.
 
 -----------------------------------------
 
-Subscriber view: Driven by events reported by the proxy:
+DONE: Eliminate unused field in InternalSipMessage
+
+-----------------------------------------
+
+Presenter: Driven by events reported by the proxy:
   registration
   de-registration
   notification from SP
   originating call
   terminating call
   call length
+  blocked call
 
-Introduce a new GenServer for this.
+Introduce a new GenServer for this. Switch to using thread-safe
+alternatives to HashMap and LinkedList, since a SIP message may be
+accessed by the proxy and the presenter in parallel.
 
 -----------------------------------------
 

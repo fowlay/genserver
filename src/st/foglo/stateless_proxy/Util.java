@@ -194,14 +194,6 @@ public final class Util {
 		display(level, String.format("%s%s %s", whiteSpace, arrow, text));
 	}
 
-	public static Integer digest(byte[] buffer, int recLength) {
-		int sum = 0;
-		for (int i = 0; i < recLength; i++) {
-			sum += (int)buffer[i];
-		}
-		return Integer.valueOf(sum);
-	}
-	
 	public static String ldt() {
 		final String ldt = LocalDateTime.now().toString();
 		final String date = ldt.substring(0, 10);

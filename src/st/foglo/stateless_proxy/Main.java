@@ -23,7 +23,7 @@ public final class Main {
 	public static final boolean NIO = ALWAYS;
 	
     public static final int[] localIpAddress = new int[]{10, 0, 0, 17};
-	// public static final int[] localIpAddress = new int[]{10, 10, 69, 179};
+	//public static final int[] localIpAddress = new int[]{10, 10, 69, 179};
 	
 	// where we listen for UEs
 	public static final byte[] sipAddrUe = Util.toByteArray(localIpAddress);
@@ -42,8 +42,14 @@ public final class Main {
 
     public static void main(String[] args) {
 
+        final GenServer pr = GenServer.start(
+                new Presenter(),
+                new Object[] {},
+                "presenter",
+                true);
+
         final GenServer px = GenServer.start(
-                new PxCb(sipAddrUe, sipPortUe, sipAddrSp, sipPortSp),
+                new PxCb(sipAddrUe, sipPortUe, sipAddrSp, sipPortSp, pr, new BlackList()),
                 new Object[] {}, // TODO, just pass null
                 "proxy",
                 true);

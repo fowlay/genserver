@@ -3,8 +3,8 @@ package st.foglo.stateless_proxy;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.Map;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import st.foglo.genserver.CallBackBase;
 import st.foglo.genserver.GenServer;
 import st.foglo.genserver.GenServer.CallResult;
@@ -34,6 +34,10 @@ public final class PxCb extends CallBackBase {
 	final Map<Side, byte[]> listenerAddresses = new HashMap<Side, byte[]>();
 	final Map<Side, Integer> listenerPorts = new HashMap<Side, Integer>();
 
+    final GenServer presenter;
+
+    final BlackList blackList;
+
 
 
     private GenServer getPortsender(Side side) {
@@ -59,13 +63,18 @@ public final class PxCb extends CallBackBase {
     }
 
 
-	public PxCb(byte[] sipAddrUe, Integer sipPortUe, byte[] sipAddrSp, Integer sipPortSp) {
+	public PxCb(byte[] sipAddrUe, Integer sipPortUe,
+                byte[] sipAddrSp, Integer sipPortSp,
+                GenServer presenter,
+                BlackList blackList) {
 
 		listenerAddresses.put(Side.UE, sipAddrUe);
 		listenerPorts.put(Side.UE, sipPortUe);
 		listenerAddresses.put(Side.SP, sipAddrSp);
 		listenerPorts.put(Side.SP, sipPortSp);
 
+        this.presenter = presenter;
+        this.blackList = blackList;
 	}
 
 	///////////////////////////////////////////
@@ -89,7 +98,7 @@ public final class PxCb extends CallBackBase {
 	public CastResult handleCast(Object message) {
 
 		MsgBase mb = (MsgBase) message;
-        
+
         if (mb instanceof KeepAliveMessage) {
 
 			final KeepAliveMessage kam = (KeepAliveMessage) message;
@@ -113,15 +122,30 @@ public final class PxCb extends CallBackBase {
 
 			InternalSipMessage ism = (InternalSipMessage) message;
 
+            
+
 			try {
 				final SipMessage sm = ism.message;
 				final Side side = ism.side;
 				final Side otherSide = otherSide(side);
 				final Method method = sm.getMethod();
+                final TYPE type = sm.type;
+                final String toUser = sm.getUser("To");
+                final String fromUser = sm.getUser("From");
 
-				if (sm.type == TYPE.request) {
+				if (type == TYPE.request) {
 
 					Util.seq(Mode.SIP, Side.PX, direction(side, otherSide), sm.firstLineNoVersion());
+
+                    // blacklisting
+                    if (method == Method.INVITE && SipMessage.isElement(fromUser, blackList.blackList)) {
+                        ism.setBlocked(true);
+                        Util.seq(Mode.SIP, Side.PX, Direction.NONE, String.format("blacklisted: %s", fromUser));
+                        presenter.cast(ism);
+                        return new CastResult(Atom.NOREPLY, TIMEOUT_NEVER);
+                    }
+
+                    presenter.cast(ism);
 
 					// Max-Forwards
 					final String mf = sm.getTopHeaderField("Max-Forwards");
@@ -143,7 +167,8 @@ public final class PxCb extends CallBackBase {
 							toDottedAddress(listenerAddress),
 							localPort.intValue(),
 							topViaBranch + "_h8k4c9ne");
-					sm.prepend("Via", newVia);
+
+                    sm.prepend("Via", newVia);
 
 					// Route header field removal from requests
 					if (method == Method.REGISTER ||
@@ -151,9 +176,9 @@ public final class PxCb extends CallBackBase {
 							method == Method.BYE ||
 							method == Method.INVITE ||
 							method == Method.SUBSCRIBE) {
-						final LinkedList<String> hh = sm.getHeaderFields("Route");
+						final ConcurrentLinkedDeque<String> hh = sm.getHeaderFields("Route");
 						if (!hh.isEmpty()) {
-							final String topRoute = hh.get(0);
+							final String topRoute = hh.peek();
 							final int indexOfSipColon = topRoute.indexOf("sip:");
 							final int indexOfSemi = topRoute.indexOf(';');
 							final String addrPort = topRoute.substring(4 + indexOfSipColon, indexOfSemi);
@@ -167,30 +192,34 @@ public final class PxCb extends CallBackBase {
 					// Terminating request
 					// this finalizes the route set for the UE
 					if (Main.RECORD_ROUTE && ism.side == Side.SP && (method == Method.INVITE || method == Method.SUBSCRIBE)) {
-						final LinkedList<String> hh = sm.getHeaderFields("Record-Route");
+						final ConcurrentLinkedDeque<String> hh = sm.getHeaderFields("Record-Route");
 						final String rrHeaderField = String.format("<sip:%s:%s;lr>",
 						    toDottedAddress(Main.sipAddrUe),
 							Main.sipPortUe.intValue());
-						((LinkedList<String>)hh).addFirst(rrHeaderField);
+						hh.addFirst(rrHeaderField);
 						sm.setHeaderFields("Record-Route", hh);
 					}
 
 					if (otherSide == Side.UE) {
-						// terminating INVITE e.g.
+                        // terminating INVITE e.g.
 
-						final String user = sm.getUser();
+                      
+                        // Util.seq(Mode.SIP, Side.PX, Direction.NONE, String.format("blacklist? %s", fromUser));
 
-						final SocketAddress sa = registry.get(user);
-						if (sa == null) {
-                            Util.seq(Mode.SIP, Side.PX, Direction.NONE, String.format("unknown: %%s", user));
-							throw new RuntimeException();
-						} else {
-							final byte[] addr = ((InetSocketAddress) sa).getAddress().getAddress();
-							final Integer port = Integer.valueOf(((InetSocketAddress) sa).getPort());
-							final GenServer gsForward = getPortsender(otherSide);
-							gsForward.cast(ism.setDestination(addr, port));
-						}
-					} else if (otherSide == Side.SP) {
+                        
+
+                            final SocketAddress sa = registry.get(toUser);
+                            if (sa == null) {
+                                Util.seq(Mode.SIP, Side.PX, Direction.NONE, String.format("unknown: %%s", toUser));
+                                throw new RuntimeException();
+                            } else {
+                                final byte[] addr = ((InetSocketAddress) sa).getAddress().getAddress();
+                                final Integer port = Integer.valueOf(((InetSocketAddress) sa).getPort());
+                                final GenServer gsForward = getPortsender(otherSide);
+                                gsForward.cast(ism.setDestination(addr, port));
+                            }
+                        
+                    } else if (otherSide == Side.SP) {
 
 						// TOXDO - these items should be passed in constructor call?
 						final byte[] addr = Main.outgoingProxyAddrSp;
@@ -202,7 +231,10 @@ public final class PxCb extends CallBackBase {
 						gsForward.cast(ism.setDestination(addr, port));
 					}
 
-				} else if (sm.type == TYPE.response) {
+				} else if (type == TYPE.response) {
+
+                    presenter.cast(ism);
+
 					// a response .. easy, just drop topmost via and use new top via as destination
 					Util.seq(Mode.SIP, Side.PX, direction(side, otherSide), sm.responseLabel());
 
@@ -228,7 +260,7 @@ public final class PxCb extends CallBackBase {
 
 		            // Record-route insertion, for certain responses
                     if (Main.RECORD_ROUTE && ism.side == Side.SP && (method == Method.INVITE || method == Method.SUBSCRIBE)) {
-                        final LinkedList<String> hh = sm.getHeaderFields("Record-Route");
+                        final ConcurrentLinkedDeque<String> hh = sm.getHeaderFields("Record-Route");
                         final String rrHeaderField = String.format("<sip:%s:%s;lr>",
                                 toDottedAddress(Main.sipAddrUe),
                                 Main.sipPortUe.intValue());
@@ -242,14 +274,14 @@ public final class PxCb extends CallBackBase {
                         final String rrHeaderField = String.format("<sip:%s:%s;lr>",
                                 toDottedAddress(Main.sipAddrUe),
                                 Main.sipPortUe.intValue());
-                        final LinkedList<String> hh = sm.getHeaderFields("Record-Route");
+                        final ConcurrentLinkedDeque<String> hh = sm.getHeaderFields("Record-Route");
                         hh.remove(rrHeaderField);
                         sm.setHeaderFields("Record-Route", hh);
                     }
 
                     // prepare internal message ready for sending
                     final InternalSipMessage ismOut = new InternalSipMessage(
-                            ism.side, sm, Integer.valueOf(0), toByteArray(destAddr),
+                            ism.side, sm, toByteArray(destAddr),
                             Integer.valueOf(Integer.parseInt(destPort)));
 
                     // finalize REGISTER actions
@@ -259,15 +291,14 @@ public final class PxCb extends CallBackBase {
                             final String branch = sm.getTopViaBranch();
                             final Boolean regAttempt = pendingRegistrations.get(branch);
                             pendingRegistrations.remove(branch);
-                            final String user = sm.getUser();
                             if (regAttempt != null && regAttempt.booleanValue()) {
                                 // REGISTER
-                                registry.put(user, UdpCb.createSocketAddress(ismOut.destAddr, ismOut.destPort));
-                                Util.seq(Mode.DEBUG, Side.PX, Direction.NONE, String.format("registered: %s -> %s:%d", user, Util.bytesToIpAddress(ismOut.destAddr), ismOut.destPort));
+                                registry.put(toUser, UdpCb.createSocketAddress(ismOut.destAddr, ismOut.destPort));
+                                Util.seq(Mode.DEBUG, Side.PX, Direction.NONE, String.format("registered: %s -> %s:%d", toUser, Util.bytesToIpAddress(ismOut.destAddr), ismOut.destPort));
                             } else if (regAttempt != null && !regAttempt.booleanValue()) {
                                 // de-REGISTER
-                                registry.remove(user);
-                                Util.seq(Mode.DEBUG, Side.PX, Direction.NONE, String.format("de-registered: %s", user));
+                                registry.remove(toUser);
+                                Util.seq(Mode.DEBUG, Side.PX, Direction.NONE, String.format("de-registered: %s", toUser));
                             }
                         }
                     }

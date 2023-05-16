@@ -9,20 +9,22 @@ public final class InternalSipMessage extends MsgBase {
 	final byte[] destAddr;
 	final Integer destPort;
 	
-	final Integer digest;
-	
 	final byte[] sourceAddr;       // optional, when receiving from UE side this may be filled in
 	final Integer sourcePort;
+
+    /**
+     * May be changed by the proxy
+     */
+    public volatile boolean blocked = false;
 	
-	public InternalSipMessage(
+
+    public InternalSipMessage(
 			Side side,
 			SipMessage message,
-			Integer digest,
 			byte[] destAddr,
 			Integer destPort) {
 		this(side,
 				message,
-				digest,
 				destAddr,
 				destPort,
 				null,
@@ -33,7 +35,6 @@ public final class InternalSipMessage extends MsgBase {
 	public InternalSipMessage(
 			Side side,
 			SipMessage message,
-			Integer digest,
 			byte[] destAddr,
 			Integer destPort,
 			byte[] sourceAddr,
@@ -41,7 +42,6 @@ public final class InternalSipMessage extends MsgBase {
 		super();
 		this.side = side;
 		this.message = message;
-		this.digest = digest;
 		this.destAddr = destAddr;
 		this.destPort = destPort;
 		this.sourceAddr = sourceAddr;
@@ -53,7 +53,14 @@ public final class InternalSipMessage extends MsgBase {
 	/////////////////////////
 	
 	public InternalSipMessage setDestination(byte[] addr, Integer port) {
-		return new InternalSipMessage(side, message, digest, addr, port);
+		return new InternalSipMessage(side, message, addr, port);
 	}
 
+    public synchronized boolean isBlocked() {
+        return blocked;
+    }
+    
+    public synchronized void setBlocked(boolean blocked) {
+        this.blocked = blocked;
+    }
 }
