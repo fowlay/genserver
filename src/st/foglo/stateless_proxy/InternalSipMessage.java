@@ -12,12 +12,6 @@ public final class InternalSipMessage extends MsgBase implements Cloneable {
 	final byte[] sourceAddr;       // optional, when receiving from UE side this may be filled in
 	final Integer sourcePort;
 
-    /**
-     * May be changed by the proxy
-     */
-    public volatile boolean blocked = false;
-	
-
     public InternalSipMessage(
 			Side side,
 			SipMessage message,
@@ -71,12 +65,4 @@ public final class InternalSipMessage extends MsgBase implements Cloneable {
 	public InternalSipMessage setDestination(byte[] addr, Integer port) {
 		return new InternalSipMessage(side, message, addr, port);
 	}
-
-    public synchronized boolean isBlocked() {
-        return blocked;
-    }
-    
-    public synchronized void setBlocked(boolean blocked) {
-        this.blocked = blocked;
-    }
 }

@@ -205,7 +205,21 @@ DONE: Deep clone of InternalSipMessage made before casting from proxy
 to other GenServers. Single-threaded HashMap and LinkedList can
 therefore be used in the wrapped SipMessage.
 
+---------------------------------
+
+DONE: Blacklisting: Blacklisted patterns, first version
+
 -----------------------------------------
+
+Cleanup: Get rid of TAB characters. No new TABs should creep in once
+VSCode is properly configured.
+
+-----------------------------------------
+
+Cleanup: The enum "Type" in SipMessage has bad casification
+
+------------------------------------------
+
 
 Presenter: Driven by events reported by the proxy:
   registration
@@ -264,7 +278,11 @@ The MicroSIP client has configuration options for ports and
 
 ---------------------------------
 
-Blacklisting: Blacklisted patterns from file?
+Blacklisting: Blacklisted patterns from file outside folder
+
+--------------------------------------
+
+Merge to master (main?) branch, accepting VSCode for development
 
 --------------------------------------
 

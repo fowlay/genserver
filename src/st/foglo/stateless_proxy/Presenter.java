@@ -28,12 +28,14 @@ public class Presenter extends CallBackBase {
 
     @Override
     public CastResult handleCast(Object message) {
+
+        // trace("we are in presenter");
+
         final InternalSipMessage ism = (InternalSipMessage) message;
         final SipMessage sm = ism.message;
         final String toUser = sm.getUser("To");
         final String fromUser = sm.getUser("From");
         final TYPE type = sm.type;
-
         final Method method = sm.getMethod();
 
         if (method == Method.REGISTER && type == TYPE.request) {
@@ -59,9 +61,11 @@ public class Presenter extends CallBackBase {
         else if (method == Method.NOTIFY && type == TYPE.request && ism.side == Side.SP) {
             present(Method.NOTIFY, toUser, fromUser, false, sm.toString());
         }
-        else if (method == Method.INVITE && type == TYPE.request && ism.side == Side.SP && ism.isBlocked()) {
-                // terminating INVITE blocked
-                present(Method.INVITE, toUser, fromUser, true, String.format("blocking call from: %s", fromUser));
+        else if (sm.isBlacklisted() && ism.side == Side.SP) {
+            // terminating INVITE blocked
+            present(Method.INVITE, toUser, fromUser, true,
+                String.format("blocking call from %s to %s", fromUser, toUser));
+            return new CastResult(Atom.NOREPLY, TIMEOUT_NEVER);
         }
 
         return new CastResult(Atom.NOREPLY, TIMEOUT_NEVER);
@@ -69,13 +73,11 @@ public class Presenter extends CallBackBase {
 
     @Override
     public CallResult handleCall(Object message) {
-        // TODO Auto-generated method stub
         throw new UnsupportedOperationException("Unimplemented method 'handleCall'");
     }
 
     @Override
     public InfoResult handleInfo(Object message) {
-        // TODO Auto-generated method stub
         throw new UnsupportedOperationException("Unimplemented method 'handleInfo'");
     }
 
@@ -95,7 +97,8 @@ public class Presenter extends CallBackBase {
                 System.out.println(text);
             }
         }
-        else if (method == Method.INVITE && blocked) {  trace("######## present blocked INVITE");
+        else if (method == Method.INVITE && blocked) {
+            // trace("######## present blocked INVITE");
         
             // Clean the map from stale entries
             final LinkedList<String> keys = new LinkedList<String>();
@@ -108,7 +111,7 @@ public class Presenter extends CallBackBase {
                 blockingMessage.remove(u);
             }
 
-            final String key = fromUser+"^"+toUser;
+            final String key = Util.mergeStrings(fromUser, toUser);
             final Long millis = blockingMessage.get(key);
             if (millis == null) {
                 System.out.println(text);

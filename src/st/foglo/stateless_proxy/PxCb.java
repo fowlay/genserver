@@ -135,17 +135,15 @@ public final class PxCb extends CallBackBase {
 
 				if (type == TYPE.request) {
 
+                    presenter.cast((InternalSipMessage)ism.clone());
+
 					Util.seq(Mode.SIP, Side.PX, direction(side, otherSide), sm.firstLineNoVersion());
 
                     // blacklisting
-                    if (method == Method.INVITE && SipMessage.isElement(fromUser, blackList.blackList)) {
-                        ism.setBlocked(true);
+                    if (sm.isBlacklisted() && side == Side.SP) {
                         Util.seq(Mode.SIP, Side.PX, Direction.NONE, String.format("blacklisted: %s", fromUser));
-                        presenter.cast((InternalSipMessage)ism.clone());
                         return new CastResult(Atom.NOREPLY, TIMEOUT_NEVER);
                     }
-
-                    presenter.cast((InternalSipMessage)ism.clone());
 
 					// Max-Forwards
 					final String mf = sm.getTopHeaderField("Max-Forwards");
