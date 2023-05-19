@@ -45,10 +45,10 @@ public class GenServer_test {
         GenServer.start(myCb, null, "my-cb-2");
 
         try {
-			Thread.sleep(800);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
+            Thread.sleep(800);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
     
     @Test
@@ -59,7 +59,8 @@ public class GenServer_test {
         GenServer gs = GenServer.start(myCb, null, "my-cb");
 
         
-        MyCb3Class.Product p = (MyCb3Class.Product)gs.call(gs, (new MyCb3Class()).new TwoFactors(8, 9));
+        MyCb3Class.Product p =
+                (MyCb3Class.Product)gs.call(gs, (new MyCb3Class()).new TwoFactors(8, 9));
         
         System.out.println(String.format("result: %d", p.product));
         

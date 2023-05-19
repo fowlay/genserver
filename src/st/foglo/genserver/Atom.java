@@ -2,8 +2,8 @@
 package st.foglo.genserver;
 
 public enum Atom {
-	// used in GsMessage
-	TIMEOUT,
+    // used in GsMessage
+    TIMEOUT,
     CAST,
     CALL,
     

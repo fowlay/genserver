@@ -7,127 +7,124 @@ import java.util.Map.Entry;
 
 
 public class SipMessage implements Cloneable {
-
-	public enum Method {
-		REGISTER,
-		INVITE,
-		ACK,
-		BYE,
-		CANCEL,
-		SUBSCRIBE,
-		NOTIFY
-	}
-	
-	final TYPE type;
-	
-	/**
-	 * A string; no CR LF at the end
-	 */
-	final String firstLine;
-	
-	/**
-	 * Keys in this map is canonical header names like Call-ID, Via, etc
-	 * 
-	 * Values are lists of as-received strings, no CR LF at end
-	 */
-	private Map<String, LinkedList<String>> headers =
+    
+    final Type type;
+    
+    /**
+     * A string; no CR LF at the end
+     */
+    final String firstLine;
+    
+    /**
+     * Keys in this map is canonical header names like Call-ID, Via, etc
+     * 
+     * Values are lists of as-received strings, no CR LF at end
+     */
+    private Map<String, LinkedList<String>> headers =
         new HashMap<String, LinkedList<String>>();
 
     // public Map<String, LinkedList<String>> getHeaders() {
     //     return headers;
     // }
-	
-	/**
-	 * One long string, with embedded CR LF sequences
-	 */
-	final String body;
-	
-	enum TYPE {
-		request,
-		response
-	}
-	
-	enum STATE {
-		scanFirstLine,
-		scanFirstLineCrSeen, scanHeaders, scanHeadersCrSeen
-	, scanBody}
-	
-	
-	public SipMessage(byte[] buffer, int size) {
-		
-		String firstLine = null;
-		STATE state = STATE.scanFirstLine;
-		StringBuilder sb = new StringBuilder();
-		byte b;
-		for (int k = 0; k < size; k++) {
-			b = buffer[k];
-			
-			if (state == STATE.scanFirstLine || state == STATE.scanFirstLineCrSeen) {
-				if (b == 13) {
-					state = STATE.scanFirstLineCrSeen;
-				}
-				else if (b == 10 && state == STATE.scanFirstLineCrSeen) {
-					firstLine = new String(sb);
-					state = STATE.scanHeaders;
-					sb = new StringBuilder();
-				}
-				else {
-					sb.append((char)b);
-				}
-			}
-			else if (state == STATE.scanHeaders || state == STATE.scanHeadersCrSeen) {
-				if (b == 13) {
-					state = STATE.scanHeadersCrSeen;
-				}
-				else if (b == 10 && state == STATE.scanHeadersCrSeen) {
-					String headerLine = new String(sb);
-					sb = new StringBuilder();
-					
-					if (headerLine.isEmpty()) {
-						state = STATE.scanBody;
-					}
-					else if (!headerLine.isEmpty()) {
-						collectHeaderLine(headerLine);
-						state = STATE.scanHeaders;
-					}
-				}
-				else {
-					sb.append((char)b);
-				}
-			}
-			else if (state == STATE.scanBody) {
-				sb.append((char)b);
-			}
-		}
-		
-		if (state == STATE.scanBody) {
-			this.body = new String(sb);
-		}
-		else if (state == STATE.scanHeaders) {
-			this.body = null;
-		}
-		else {
-			// internal error
-			this.body = null;
-		}
+    
+    /**
+     * One long string, with embedded CR LF sequences
+     */
+    final String body;
+    
+    enum Type {
+        REQUEST,
+        RESPONSE
+    }
 
-		this.firstLine = firstLine;
-		
-		this.type = firstLine.startsWith("SIP/2.0") ? TYPE.response : TYPE.request;
+    public enum Method {
+        REGISTER,
+        INVITE,
+        ACK,
+        BYE,
+        CANCEL,
+        SUBSCRIBE,
+        NOTIFY
+    }
+    
+    enum State {
+        SCAN_FIRST_LINE,
+        SCAN_FIRST_LINE_CR_SEEN,
+        SCAN_HEADERS,
+        SCAN_HEADERS_CR_SEEN,
+        SCAN_BODY}
+    
+    
+    public SipMessage(byte[] buffer, int size) {
+        
+        String firstLine = null;
+        State state = State.SCAN_FIRST_LINE;
+        StringBuilder sb = new StringBuilder();
+        byte b;
+        for (int k = 0; k < size; k++) {
+            b = buffer[k];
+            
+            if (state == State.SCAN_FIRST_LINE || state == State.SCAN_FIRST_LINE_CR_SEEN) {
+                if (b == 13) {
+                    state = State.SCAN_FIRST_LINE_CR_SEEN;
+                }
+                else if (b == 10 && state == State.SCAN_FIRST_LINE_CR_SEEN) {
+                    firstLine = new String(sb);
+                    state = State.SCAN_HEADERS;
+                    sb = new StringBuilder();
+                }
+                else {
+                    sb.append((char)b);
+                }
+            }
+            else if (state == State.SCAN_HEADERS || state == State.SCAN_HEADERS_CR_SEEN) {
+                if (b == 13) {
+                    state = State.SCAN_HEADERS_CR_SEEN;
+                }
+                else if (b == 10 && state == State.SCAN_HEADERS_CR_SEEN) {
+                    String headerLine = new String(sb);
+                    sb = new StringBuilder();
+                    
+                    if (headerLine.isEmpty()) {
+                        state = State.SCAN_BODY;
+                    }
+                    else if (!headerLine.isEmpty()) {
+                        collectHeaderLine(headerLine);
+                        state = State.SCAN_HEADERS;
+                    }
+                }
+                else {
+                    sb.append((char)b);
+                }
+            }
+            else if (state == State.SCAN_BODY) {
+                sb.append((char)b);
+            }
+        }
+        
+        if (state == State.SCAN_BODY) {
+            this.body = new String(sb);
+        }
+        else if (state == State.SCAN_HEADERS) {
+            this.body = null;
+        }
+        else {
+            // internal error
+            this.body = null;
+        }
 
-	}
+        this.firstLine = firstLine;
+        
+        this.type = firstLine.startsWith("SIP/2.0") ? Type.RESPONSE : Type.REQUEST;
+
+    }
 
     //////////////////////////
 
-    public Object clone() {
-        try {
-            final Object result = (SipMessage)super.clone();
-            ((SipMessage)result).headers = copyMap(((SipMessage)result).headers);
-            return result;
-        } catch (CloneNotSupportedException e) {
-            e.printStackTrace();
-            return null;
-        }
+    public Object clone() throws CloneNotSupportedException {
+        final Object result = (SipMessage) super.clone();
+        ((SipMessage) result).headers = copyMap(((SipMessage) result).headers);
+        return result;
     }
 
     private static Map<String, LinkedList<String>> copyMap(Map<String, LinkedList<String>> map) {
@@ -146,61 +143,61 @@ public class SipMessage implements Cloneable {
         return result;
     }
 
-	
-	////////////////////////
-	
-	private void collectHeaderLine(String headerLine) {
-		
-		int indexColon = headerLine.indexOf(':');
-		String key = headerLine.substring(0, indexColon);
-		
-		if (headers.get(key) == null) {
-			LinkedList<String> hh = new LinkedList<String>();
-			hh.add(headerLine.substring(1+indexColon).trim());
-			headers.put(key, hh);
-			//Util.trace(Level.verbose, "+++ %s -> %s", key, headerLine);
-		}
-		else {
-			LinkedList<String> hh = headers.get(key);
-			hh.add(headerLine.substring(1+indexColon).trim());
-			//Util.trace(Level.verbose, "+++ %s -> %s", key, headerLine);
-		}
-	}
+    
+    ////////////////////////
+    
+    private void collectHeaderLine(String headerLine) {
+        
+        int indexColon = headerLine.indexOf(':');
+        String key = headerLine.substring(0, indexColon);
+        
+        if (headers.get(key) == null) {
+            LinkedList<String> hh = new LinkedList<String>();
+            hh.add(headerLine.substring(1+indexColon).trim());
+            headers.put(key, hh);
+            //Util.trace(Level.verbose, "+++ %s -> %s", key, headerLine);
+        }
+        else {
+            LinkedList<String> hh = headers.get(key);
+            hh.add(headerLine.substring(1+indexColon).trim());
+            //Util.trace(Level.verbose, "+++ %s -> %s", key, headerLine);
+        }
+    }
 
-	public String toString() {
-		final byte[] crLf = new byte[]{13, 10};
-		final StringBuilder sb = new StringBuilder();
-		sb.append(firstLine);
-		sb.append(Character.valueOf((char) crLf[1]));
-		
-		for (Entry<String, LinkedList<String>> me : headers.entrySet()) {
-			final LinkedList<String> hh = me.getValue();
-			final String key = me.getKey();
-			for (String s : hh) {
-				sb.append(key);
-				sb.append(": ");
-				sb.append(s);
-				sb.append(Character.valueOf((char) crLf[1]));
-			}
-		}
-		if (body != null) {
-			sb.append(Character.valueOf((char) crLf[1]));
-			sb.append(body);
-		}
-		return new String(sb);
-	}
+    public String toString() {
+        final byte[] crLf = new byte[]{13, 10};
+        final StringBuilder sb = new StringBuilder();
+        sb.append(firstLine);
+        sb.append(Character.valueOf((char) crLf[1]));
+        
+        for (Entry<String, LinkedList<String>> me : headers.entrySet()) {
+            final LinkedList<String> hh = me.getValue();
+            final String key = me.getKey();
+            for (String s : hh) {
+                sb.append(key);
+                sb.append(": ");
+                sb.append(s);
+                sb.append(Character.valueOf((char) crLf[1]));
+            }
+        }
+        if (body != null) {
+            sb.append(Character.valueOf((char) crLf[1]));
+            sb.append(body);
+        }
+        return new String(sb);
+    }
 
-	public String getUser(String key) {
+    public String getUser(String key) {
 
-		final String toHeader = getTopHeaderField(key);
-		
-		final int posSip = toHeader.indexOf("sip:");
-		final int posAtSign = toHeader.indexOf('@');
-		
-		return toHeader.substring(posSip+4, posAtSign);
-	}
-	
-	public String firstLineNoVersion() {
+        final String toHeader = getTopHeaderField(key);
+        
+        final int posSip = toHeader.indexOf("sip:");
+        final int posAtSign = toHeader.indexOf('@');
+        
+        return toHeader.substring(posSip+4, posAtSign);
+    }
+    
+    public String firstLineNoVersion() {
         final String[] parts = firstLine.split(" ");
         final StringBuilder sb = new StringBuilder();
         for (String u : parts) {
@@ -231,58 +228,58 @@ public class SipMessage implements Cloneable {
         }
     }
 
-	public LinkedList<String> getHeaderFields(String key) {
-		final LinkedList<String> toHeaderFields = headers.get(key);
-		if (toHeaderFields == null) {
-			return new LinkedList<String>();
-		}
-		else {
-			return toHeaderFields;
-		}
-	}
+    public LinkedList<String> getHeaderFields(String key) {
+        final LinkedList<String> toHeaderFields = headers.get(key);
+        if (toHeaderFields == null) {
+            return new LinkedList<String>();
+        }
+        else {
+            return toHeaderFields;
+        }
+    }
 
 
-	/**
-	 * 
-	 * @param key A key such as "Route"
-	 * @return The topmost header field value
-	 */
-	public String getTopHeaderField(String key) {
-		final LinkedList<String> fields = getHeaderFields(key);
-		if (fields.isEmpty()) {
-			return null;
-		}
-		else {
-			return fields.peek();
-		}
-	}
+    /**
+     * 
+     * @param key A key such as "Route"
+     * @return The topmost header field value
+     */
+    public String getTopHeaderField(String key) {
+        final LinkedList<String> fields = getHeaderFields(key);
+        if (fields.isEmpty()) {
+            return null;
+        }
+        else {
+            return fields.peek();
+        }
+    }
 
-	public Method getMethod() {
-		if (type == TYPE.request) {
-			final int firstSpacePos = firstLine.indexOf(' ');
-			final String firstWord = firstLine.substring(0, firstSpacePos);
-			for (Method m : Method.values()) {
-				if (m.toString().equals(firstWord)) {
-					return m;
-				}
-			}
-			throw new RuntimeException();
-		}
-		else if (type == TYPE.response) {
-			final LinkedList<String> hh = getHeaderFields("CSeq");
-			final String[] words = hh.peek().split(" ");
-			final String word = words[words.length - 1];
-			for (Method m : Method.values()) {
-				if (m.toString().equals(word)) {
-					return m;
-				}
-			}
-			throw new RuntimeException();
-		}
-		else {
-			throw new RuntimeException();
-		}
-	}
+    public Method getMethod() {
+        if (type == Type.REQUEST) {
+            final int firstSpacePos = firstLine.indexOf(' ');
+            final String firstWord = firstLine.substring(0, firstSpacePos);
+            for (Method m : Method.values()) {
+                if (m.toString().equals(firstWord)) {
+                    return m;
+                }
+            }
+            throw new RuntimeException();
+        }
+        else if (type == Type.RESPONSE) {
+            final LinkedList<String> hh = getHeaderFields("CSeq");
+            final String[] words = hh.peek().split(" ");
+            final String word = words[words.length - 1];
+            for (Method m : Method.values()) {
+                if (m.toString().equals(word)) {
+                    return m;
+                }
+            }
+            throw new RuntimeException();
+        }
+        else {
+            throw new RuntimeException();
+        }
+    }
 
     public int getCode() {
         // applicable to responses only
@@ -371,87 +368,87 @@ public class SipMessage implements Cloneable {
 
 
 
-	public void prepend(String key, String headerFieldValue) {
-		LinkedList<String> headerFields = getHeaderFields(key);
+    public void prepend(String key, String headerFieldValue) {
+        LinkedList<String> headerFields = getHeaderFields(key);
         headerFields.addFirst(headerFieldValue);
-	}
+    }
 
     
 
-	public void dropFirst(String key) {
-		final LinkedList<String> hh = getHeaderFields(key);
-		hh.poll();
-		if (hh.isEmpty()) {
-			headers.remove(key);
-		}
-		else {
-			setHeaderFields(key, hh);
-		}
-	}
+    public void dropFirst(String key) {
+        final LinkedList<String> hh = getHeaderFields(key);
+        hh.poll();
+        if (hh.isEmpty()) {
+            headers.remove(key);
+        }
+        else {
+            setHeaderFields(key, hh);
+        }
+    }
 
-	/**
-	 * @param key
-	 * @param headerFields
-	 */
-	public void setHeaderFields(String key, LinkedList<String> headerFields) {
-		headers.put(key, headerFields);
-	}
+    /**
+     * @param key
+     * @param headerFields
+     */
+    public void setHeaderFields(String key, LinkedList<String> headerFields) {
+        headers.put(key, headerFields);
+    }
 
-	public void setHeaderField(String key, String headerField) {
-		final LinkedList<String> headerFields = new LinkedList<String>();
-		headerFields.add(headerField);
-		setHeaderFields(key, headerFields);
-	}
+    public void setHeaderField(String key, String headerField) {
+        final LinkedList<String> headerFields = new LinkedList<String>();
+        headerFields.add(headerField);
+        setHeaderFields(key, headerFields);
+    }
 
 
-	public byte[] toByteArray() {
-		
-		byte[] ba = new byte[10000];   // TOXDO, ugly
-		int k = 0;
-		
-		for (byte b : firstLine.getBytes()) {
-			ba[k++] = b;
-		}
-		ba[k++] = 13;
-		ba[k++] = 10;
+    public byte[] toByteArray() {
+        
+        byte[] ba = new byte[10000];   // TOXDO, ugly
+        int k = 0;
+        
+        for (byte b : firstLine.getBytes()) {
+            ba[k++] = b;
+        }
+        ba[k++] = 13;
+        ba[k++] = 10;
 
-		for (Map.Entry<String, LinkedList<String>> e : headers.entrySet()) {
-			final String key = e.getKey();
-			for (String h : e.getValue()) {
-				for (byte b : key.getBytes()) {
-					ba[k++] = b;
-				}
-				ba[k++] = ':';
-				ba[k++] = ' ';
-				for (byte b : h.getBytes()) {
-					ba[k++] = b;
-				}
-				ba[k++] = 13;
-				ba[k++] = 10;
-			}
-		}
+        for (Map.Entry<String, LinkedList<String>> e : headers.entrySet()) {
+            final String key = e.getKey();
+            for (String h : e.getValue()) {
+                for (byte b : key.getBytes()) {
+                    ba[k++] = b;
+                }
+                ba[k++] = ':';
+                ba[k++] = ' ';
+                for (byte b : h.getBytes()) {
+                    ba[k++] = b;
+                }
+                ba[k++] = 13;
+                ba[k++] = 10;
+            }
+        }
 
-		if (body != null) {
-			ba[k++] = 13;
-			ba[k++] = 10;
-			
-			for (byte b : body.getBytes()) {
-				ba[k++] = b;
-			}
-		}
-		
-		byte[] result = new byte[k];
-		
-		for (int j = 0; j < k; j++) {
-			result[j] = ba[j];
-		}
-		
-		return result;
-	}
+        if (body != null) {
+            ba[k++] = 13;
+            ba[k++] = 10;
+            
+            for (byte b : body.getBytes()) {
+                ba[k++] = b;
+            }
+        }
+        
+        byte[] result = new byte[k];
+        
+        for (int j = 0; j < k; j++) {
+            result[j] = ba[j];
+        }
+        
+        return result;
+    }
 
     public boolean isBlacklisted() {
         return
-            type == TYPE.request &&
+            type == Type.REQUEST &&
             getMethod() == Method.INVITE &&
             SipMessage.isElement(getUser("From"), BlackList.blacklist());
     }

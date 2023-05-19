@@ -26,116 +26,123 @@ import st.foglo.stateless_proxy.Util.Mode;
  */
 public abstract class UdpCb extends CallBackBase {
 
-	public UdpCb(Side side, GenServer proxy) {
-		this.side = side;
-		this.proxy = proxy;
-	}
+    public UdpCb(Side side, GenServer proxy) {
+        this.side = side;
+        this.proxy = proxy;
+    }
 
-	protected final InitResult initResult = new InitResult(Atom.OK, CallBack.TIMEOUT_ZERO);
+    protected final InitResult initResult = new InitResult(Atom.OK, CallBack.TIMEOUT_ZERO);
     protected final CastResult castResult = new CastResult(Atom.NOREPLY, CallBack.TIMEOUT_ZERO);
-	protected final Side side;
-	protected final GenServer proxy;
-	protected byte[] outgoingProxyAddr;
-	protected int outgoingProxyPort;
-	protected DatagramSocket socket;
+    protected final Side side;
+    protected final GenServer proxy;
+    protected byte[] outgoingProxyAddr;
+    protected int outgoingProxyPort;
+    protected DatagramSocket socket;
 
-	protected final byte[] recBuffer = new byte[Main.DATAGRAM_MAX_SIZE];
-
-
-	protected DatagramChannel channel;
-
-	protected ChannelWrapper channelWrapper;
-
-	protected volatile Thread thread;
-
-	protected ByteBuffer byteBuffer;
-
-	class ChannelWrapper {
-
-		final Side side;
-		
-		final byte[] localAddr;
-		final int localPort;
-
-		final byte[] remoteAddr;
-		final int remotePort;
-
-		DatagramChannel channel;
-
-		public ChannelWrapper(Side side, byte[] localAddr, int localPort, byte[] remoteAddr, int remotePort) {
-			this.side = side;
-			this.localAddr = localAddr;
-			this.localPort = localPort;
-			this.remoteAddr = remoteAddr;
-			this.remotePort = remotePort;
-		}
-
-		boolean isOpen() {
-			return this.channel != null && this.channel.isOpen();
-		}
-
-		void prepare() {
-			// side effect on 'channel'
-
-			try {
-				this.channel = DatagramChannel.open();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-
-			if (side == Side.UE) {
-				SocketAddress sa = null;
-				try {
-					sa = createSocketAddress(localAddr, localPort);
-				} catch (UnknownHostException e) {
-					e.printStackTrace();
-				}
-
-				try {
-					this.channel.bind(sa);
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-			}
-			else if (side == Side.SP) {
-				//SocketAddress saRemote = null;
-				SocketAddress saLocal = null;
-				try {
-					// TOXDO - Main.sipAddrSp should be passed as an argument
-					//saRemote = UdpCb.createSocketAddress(remoteAddr, remotePort);
-					saLocal = UdpCb.createSocketAddress(localAddr, localPort);
-				} catch (UnknownHostException e) {
-					e.printStackTrace();
-				}
-
-				try {
-					this.channel.bind(saLocal);
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-				// try {
-				// 	Util.seq(Level.verbose, side, Direction.NONE,
-				// 	    String.format("connect to: %s:%d", Util.bytesToIpAddress(remoteAddr), remotePort));
-				// 	this.channel.connect(saRemote);
-				// } catch (IOException e) {
-				// 	e.printStackTrace();
-				// }
-			}
-		}
-	}
-
-	@Override
-	public InitResult init(Object[] args) {
-		thread = Thread.currentThread();
-		byteBuffer = ByteBuffer.allocate(Main.DATAGRAM_MAX_SIZE);
-		return new InitResult(Atom.OK, TIMEOUT_ZERO);
-	}
-
-	@Override
-	abstract public CastResult handleCast(Object message);
+    protected final byte[] recBuffer = new byte[Main.DATAGRAM_MAX_SIZE];
 
 
-	protected CastResult handleKeepAliveMessage(Side side, KeepAliveMessage mb) {
+    protected DatagramChannel channel;
+
+    protected ChannelWrapper channelWrapper;
+
+    protected volatile Thread thread;
+
+    protected ByteBuffer byteBuffer;
+
+    class ChannelWrapper {
+
+        final Side side;
+        
+        final byte[] localAddr;
+        final int localPort;
+
+        final byte[] remoteAddr;
+        final int remotePort;
+
+        DatagramChannel channel;
+
+        public ChannelWrapper(
+                Side side,
+                byte[] localAddr,
+                int localPort,
+                byte[] remoteAddr,
+                int remotePort) {
+            this.side = side;
+            this.localAddr = localAddr;
+            this.localPort = localPort;
+            this.remoteAddr = remoteAddr;
+            this.remotePort = remotePort;
+        }
+
+        boolean isOpen() {
+            return this.channel != null && this.channel.isOpen();
+        }
+
+        void prepare() {
+            // side effect on 'channel'
+
+            try {
+                this.channel = DatagramChannel.open();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            if (side == Side.UE) {
+                SocketAddress sa = null;
+                try {
+                    sa = createSocketAddress(localAddr, localPort);
+                } catch (UnknownHostException e) {
+                    e.printStackTrace();
+                }
+
+                try {
+                    this.channel.bind(sa);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            else if (side == Side.SP) {
+                //SocketAddress saRemote = null;
+                SocketAddress saLocal = null;
+                try {
+                    // TOXDO - Main.sipAddrSp should be passed as an argument
+                    //saRemote = UdpCb.createSocketAddress(remoteAddr, remotePort);
+                    saLocal = UdpCb.createSocketAddress(localAddr, localPort);
+                } catch (UnknownHostException e) {
+                    e.printStackTrace();
+                }
+
+                try {
+                    this.channel.bind(saLocal);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                // try {
+                //     Util.seq(Level.verbose, side, Direction.NONE,
+                //         String.format("connect to: %s:%d",
+                //                       Util.bytesToIpAddress(remoteAddr),
+                //                       remotePort));
+                //     this.channel.connect(saRemote);
+                // } catch (IOException e) {
+                //     e.printStackTrace();
+                // }
+            }
+        }
+    }
+
+    @Override
+    public InitResult init(Object[] args) {
+        thread = Thread.currentThread();
+        byteBuffer = ByteBuffer.allocate(Main.DATAGRAM_MAX_SIZE);
+        return new InitResult(Atom.OK, TIMEOUT_ZERO);
+    }
+
+    @Override
+    abstract public CastResult handleCast(Object message);
+
+
+    protected CastResult handleKeepAliveMessage(Side side, KeepAliveMessage mb) {
 
         if (!channelWrapper.isOpen()) {
             channelWrapper.prepare();
@@ -166,52 +173,57 @@ public abstract class UdpCb extends CallBackBase {
     }
 
 
-	@Override
-	public CallResult handleCall(Object message) {
-		MsgBase mb = (MsgBase)message;
-		if (mb instanceof GetLocalPortMsg) {
-			final int localPort = socket.getLocalPort();
-			return new CallResult(Atom.REPLY, Integer.valueOf(localPort), TIMEOUT_ZERO);
-		}
-		else {
-			throw new RuntimeException();
-		}
-	}
-
-	@Override
-	public InfoResult handleInfo(Object message) {
-		return null;
-	}
-
-	@Override
-	public void handleTerminate() {
-		socket.close();
-	}
-
-
-
-
-    public static SocketAddress createSocketAddress(byte[] addr, int port) throws UnknownHostException {
-		return new InetSocketAddress(InetAddress.getByAddress(addr), port);
+    @Override
+    public CallResult handleCall(Object message) {
+        MsgBase mb = (MsgBase)message;
+        if (mb instanceof GetLocalPortMsg) {
+            final int localPort = socket.getLocalPort();
+            return new CallResult(Atom.REPLY, Integer.valueOf(localPort), TIMEOUT_ZERO);
+        }
+        else {
+            throw new RuntimeException();
+        }
     }
 
-	class UdpInfoResult {
-		final boolean timedOut; // TODO, misleading name, we get interrupted rather than timing out
-		final byte[] sourceAddr;
-		final Integer sourcePort;
-		final int datagramSize;  // TODO, use of -1, is it correct? Use 0?
+    @Override
+    public InfoResult handleInfo(Object message) {
+        return null;
+    }
 
-		public UdpInfoResult(boolean timedOut, byte[] sourceAddr, Integer sourcePort, int datagramSize) {
-			this.timedOut = timedOut;
-			this.sourceAddr = sourceAddr;
-			this.sourcePort = sourcePort;
-			this.datagramSize = datagramSize;
-		}
-	}
+    @Override
+    public void handleTerminate() {
+        socket.close();
+    }
 
-	protected InitResult udpInit(Side side, byte[] addr, int port) {
+
+
+
+    public static SocketAddress createSocketAddress(byte[] addr, int port)
+            throws UnknownHostException {
+        return new InetSocketAddress(InetAddress.getByAddress(addr), port);
+    }
+
+    class UdpInfoResult {
+        final boolean timedOut; // TODO, misleading name, we get interrupted typically
+        final byte[] sourceAddr;
+        final Integer sourcePort;
+        final int datagramSize;  // TODO, use of -1, is it correct? Use 0?
+
+        public UdpInfoResult(
+                boolean timedOut,
+                byte[] sourceAddr,
+                Integer sourcePort,
+                int datagramSize) {
+            this.timedOut = timedOut;
+            this.sourceAddr = sourceAddr;
+            this.sourcePort = sourcePort;
+            this.datagramSize = datagramSize;
+        }
+    }
+
+    protected InitResult udpInit(Side side, byte[] addr, int port) {
         return new InitResult(Atom.OK, TIMEOUT_ZERO);
-	}
+    }
 
     protected UdpInfoResult udpInfo(Side side) {
         // reading from UDP
@@ -297,7 +309,7 @@ public abstract class UdpCb extends CallBackBase {
         try {
             Util.seq(Mode.DEBUG, side, Direction.NONE, "sending!");
             final int nofBytesSent = channelWrapper.channel.send(byteBuffer, sa);
-            Util.seq(Mode.DEBUG, side, Direction.NONE, String.format("bytes sent: %d", nofBytesSent));
+            Util.seq(Mode.DEBUG, side, Direction.NONE, "bytes sent: %d", nofBytesSent);
 
         } catch (IOException e) {
             e.printStackTrace();

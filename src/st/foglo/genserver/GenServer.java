@@ -5,21 +5,29 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-import st.foglo.stateless_proxy.Side;
-import st.foglo.stateless_proxy.Util;
-import st.foglo.stateless_proxy.Util.Direction;
-import st.foglo.stateless_proxy.Util.Mode;
-
 /**
  * Generic server; the behavior is provided in a class that implements
  * the CallBack interface.
  */
 public final class GenServer implements Runnable {
 
+    public static final TraceMode[] TRACE_MODES = new TraceMode[]{
+        TraceMode.DEBUG,
+        TraceMode.VERBOSE,
+        TraceMode.SILENT
+    };
+
+    enum TraceMode {
+        SILENT,
+        VERBOSE,
+        DEBUG
+    }
+
     /**
      * Named GenServer processes.
      */
-    public static final ConcurrentMap<String, GenServer> registry = new ConcurrentHashMap<String, GenServer>();
+    public static final ConcurrentMap<String, GenServer> registry =
+            new ConcurrentHashMap<String, GenServer>();
 
     private final String name;
 
@@ -144,7 +152,8 @@ public final class GenServer implements Runnable {
         return start(cb, args, name, register, -1);
     }
    
-    public static GenServer start(CallBack cb, Object[] args, String name, boolean register, int trace) {
+    public static GenServer start(CallBack cb, Object[] args, String name, boolean register,
+            int trace) {
         final GenServer gs = new GenServer(cb, name, args, trace);
         final Thread thread = new Thread(gs, name);
         thread.start();
@@ -171,25 +180,35 @@ public final class GenServer implements Runnable {
 
     public void cast(Object object) {
 
-        Util.seq(Mode.GENSERVER, Side.PX, Direction.NONE,
-                String.format("gsForward thread name is: %s", getThread().getName()));
+        // Util.seq(Mode.GENSERVER, Side.PX, Direction.NONE,
+        //         String.format());
 
-        Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE,
-                String.format("about to insert! - we are using instance: %s %s", threadName,
-                        getThread().getName()));
+        trace(TraceMode.DEBUG, "gsForward thread name is: %s", getThread().getName());
+
+        // Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE,
+        //         String.format("about to insert! - we are using instance: %s %s", threadName,
+        //                 getThread().getName()));
+
+        trace(TraceMode.DEBUG, "about to insert! - we are using instance: %s %s", threadName, getThread().getName());
 
         insertMessage(new GsMessage(Atom.CAST, object));
 
-        Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE, String.format(
-                "about to MAYBE interrupt! - we are using instance: %s %s", threadName, getThread().getName()));
+        // Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE, String.format(
+        //         "about to MAYBE interrupt! - we are using instance: %s %s",
+        //         threadName, getThread().getName()));
+        trace(TraceMode.DEBUG, "about to MAYBE interrupt! - we are using instance: %s %s",
+        threadName, getThread().getName());
 
         if (cb.canBeInterrupted()) {
-            Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE, "about to interrupt!");
+        //     Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE, "about to interrupt!");
+
+            trace(TraceMode.DEBUG, "%s", "about to interrupt!");
 
             Thread.yield();
             getThread().interrupt();
 
-            Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE, "done interrupt!");
+            // Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE, "done interrupt!");
+            trace(TraceMode.DEBUG, "done interrupt!");
         }
     }
     
@@ -220,8 +239,9 @@ public final class GenServer implements Runnable {
     @Override
     public void run() {
         
-	Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE,
-        String.format("start to run: %s", Thread.currentThread().getName()));
+    // Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE,
+    //     String.format("start to run: %s", Thread.currentThread().getName()));
+    trace(TraceMode.VERBOSE, "start to run: %s", Thread.currentThread().getName());
 
         if (threadName == null) {
             // anything else would be impossible?
@@ -372,28 +392,25 @@ public final class GenServer implements Runnable {
         }
     }
     
+  
+
     private void insertMessage(GsMessage message) {
-        Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE, "insertMessage 1");
+
         final boolean wasEmpty;
         synchronized (monitorMessageQueue) {
             wasEmpty = messageQueue.isEmpty();
             messageQueue.add(message);
         }
-        Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE, "insertMessage 2");
         if (wasEmpty) {
             try {
                 synchronized (monitorTimeout) {
-                    Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE, "insertMessage 2.1");
                     timeout = -1;
-                    Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE, "insertMessage 2.2");
                     monitorTimeout.notify();
-                    Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE, "insertMessage 2.3");
                 }
             } catch (IllegalMonitorStateException x) {
                 x.printStackTrace();
             }
         }
-        Util.seq(Mode.GENSERVER, Side.GS, Direction.NONE, "insertMessage 3");
     }
 
     public Thread getThread() {
@@ -411,24 +428,42 @@ public final class GenServer implements Runnable {
     }
 
 
-    
-    
-    
-//    private void trace(String s) {
-//    	if (msgLevel >= 0) {
-//    		System.err.println("GenServer: " + String.format(s));
-//    	}
-//    }
-    
-//    private void trace(String s, int j) {
-//    	if (msgLevel >= 1) {
-//    		System.err.println("GenServer: " + String.format(s, j));
-//    	}
-//    }
-    
-//    private void trace(String s, long j) {
-//    	if (msgLevel >= 1) {
-//    		System.err.println("GenServer: " + String.format(s, j));
-//    	}
-//    }
+    static void trace(TraceMode traceMode, String text) {
+        if (isMember(traceMode, TRACE_MODES)) {
+            traceHelper(text);
+        }
+    }
+
+    static void trace(TraceMode traceMode, String format, String text) {
+        if (isMember(traceMode, TRACE_MODES)) {
+            traceHelper(format, text);
+        }
+    }
+
+    static void trace(TraceMode traceMode, String format, String text1, String text2) {
+        if (isMember(traceMode, TRACE_MODES)) {
+            traceHelper(format, text1, text2);
+        }
+    }
+
+    static void traceHelper(String text) {
+        System.out.println(String.format("[GenServer] %s", text));
+    }
+
+    static void traceHelper(String format, String text) {
+        traceHelper(String.format(format, text));
+    }
+
+    static void traceHelper(String format, String text1, String text2) {
+        traceHelper(String.format(format, text1, text2));
+    }
+
+    static boolean isMember(TraceMode m, TraceMode[] mm) {
+        for (TraceMode x : mm) {
+            if (m == x) {
+                return true;
+            }
+        }
+        return false;
+    }
 }

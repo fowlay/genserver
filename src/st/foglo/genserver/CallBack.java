@@ -10,13 +10,13 @@ public interface CallBack {
     public static final long TIMEOUT_ZERO = 0;
     public static final long TIMEOUT_NEVER = -1;
     
-	/**
-	 * This method is called when a GenServer instance is started.
-	 * Return as follows:
-	 * 
-	 * CallResult.code = ok | stop
-	 * CallResult.timeoutMillis = -1 | 0..
-	 */
+    /**
+     * This method is called when a GenServer instance is started.
+     * Return as follows:
+     * 
+     * CallResult.code = ok | stop
+     * CallResult.timeoutMillis = -1 | 0..
+     */
     public InitResult init(Object[] args);
     
     /**

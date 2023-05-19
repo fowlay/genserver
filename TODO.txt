@@ -211,15 +211,24 @@ DONE: Blacklisting: Blacklisted patterns, first version
 
 -----------------------------------------
 
-Cleanup: Get rid of TAB characters. No new TABs should creep in once
-VSCode is properly configured.
+DONE: Cleanup: Get rid of TAB characters. No new TABs should creep in
+once VSCode is properly configured.
 
 -----------------------------------------
 
-Cleanup: The enum "Type" in SipMessage has bad casification
+DONE: Cleanup: The enum "Type" in SipMessage has bad casification
 
 ------------------------------------------
 
+DONE: The clone() methods: Make them throw, in case all invocations
+happen within a general try-catch.
+
+----------------------------------
+
+DONE: GenServer: The package must not have external dependencies. Add
+package-local trace functions.
+
+------------------------------------------
 
 Presenter: Driven by events reported by the proxy:
   registration
@@ -240,16 +249,11 @@ Erlang similarity?
 ------------------------------------------
 
 Add an Info class that can summarize counters and such, with a telnet
-server operator interface (supporting one operator at a time).
+server operator interface (supporting one connection at a time).
 
 ------------------------------------------
 
 GenServer: Has the concept been implemented already?
-
-----------------------------------
-
-GenServer: The package must not have external dependencies. Watch out
-for imports from Util.
 
 -------------------------------------
 
@@ -258,7 +262,7 @@ revise the naming .. use "status" for ok/reply/noreply/stop?
 
 ----------------------------------------
 
-A supervisor process should be introduced.
+A supervisor process could be introduced.
 
 The synchronized startup sequence can be
 

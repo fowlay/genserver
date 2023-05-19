@@ -9,8 +9,8 @@ import st.foglo.genserver.GenServer.InitResult;
 import st.foglo.genserver.Atom;
 
 public final class MyCbClass extends CallBackBase {
-	
-	private int count = 0;
+    
+    private int count = 0;
     
     /////////////////////
 
@@ -21,14 +21,14 @@ public final class MyCbClass extends CallBackBase {
 
     @Override
     public CastResult handleCast(Object message) {
-    	count++;
+        count++;
         System.out.println(String.format("new value: %d", count));
         return new CastResult(Atom.NOREPLY, CallBack.TIMEOUT_NEVER);
     }
 
     @Override
     public InfoResult handleInfo(Object message) {
-    	return null;
+        return null;
     }
 
     @Override

@@ -11,7 +11,7 @@ import st.foglo.genserver.GenServer.CastResult;
 import st.foglo.genserver.GenServer.InfoResult;
 import st.foglo.genserver.GenServer.InitResult;
 import st.foglo.stateless_proxy.SipMessage.Method;
-import st.foglo.stateless_proxy.SipMessage.TYPE;
+import st.foglo.stateless_proxy.SipMessage.Type;
 
 public class Presenter extends CallBackBase {
 
@@ -35,14 +35,16 @@ public class Presenter extends CallBackBase {
         final SipMessage sm = ism.message;
         final String toUser = sm.getUser("To");
         final String fromUser = sm.getUser("From");
-        final TYPE type = sm.type;
+        final Type type = sm.type;
         final Method method = sm.getMethod();
 
-        if (method == Method.REGISTER && type == TYPE.request) {
+        if (method == Method.REGISTER && type == Type.REQUEST) {
             // save the From tag, when response comes look it up
-            regTrans.put(sm.getTag("From"), Boolean.valueOf(!sm.isDeRegister())); // true -> REG, false -> de-REG
+            regTrans.put(
+                sm.getTag("From"),
+                Boolean.valueOf(!sm.isDeRegister())); // true -> REG, false -> de-REG
         }
-        else if (method == Method.REGISTER && type == TYPE.response) {
+        else if (method == Method.REGISTER && type == Type.RESPONSE) {
             final int code = sm.getCode();
             if (code >= 200 && code < 300) {
                 final String fromTag = sm.getTag("From");
@@ -50,15 +52,17 @@ public class Presenter extends CallBackBase {
                 if (reg != null) {
                     regTrans.remove(fromTag);
                     if (reg.booleanValue()) {
-                        present(Method.REGISTER, toUser, fromUser, false, String.format("+++ %s registered", toUser));
+                        present(Method.REGISTER, toUser, fromUser, false,
+                                String.format("+++ %s registered", toUser));
                     }
                     else {
-                        present(Method.REGISTER, toUser, fromUser, false, String.format("+++ %s unregistered", toUser));
+                        present(Method.REGISTER, toUser, fromUser, false,
+                        String.format("+++ %s unregistered", toUser));
                     }
                 }
             }
         }
-        else if (method == Method.NOTIFY && type == TYPE.request && ism.side == Side.SP) {
+        else if (method == Method.NOTIFY && type == Type.REQUEST && ism.side == Side.SP) {
             present(Method.NOTIFY, toUser, fromUser, false, sm.toString());
         }
         else if (sm.isBlacklisted() && ism.side == Side.SP) {
@@ -86,7 +90,8 @@ public class Presenter extends CallBackBase {
     }
 
     
-    private void present(Method method, String toUser, String fromUser, boolean blocked, String text) {
+    private void present(Method method, String toUser, String fromUser,
+            boolean blocked, String text) {
         if (method == Method.REGISTER) {
             // suppress repeated printouts
             final String previousMessage = previousRegMessage.get(toUser);
