@@ -10,8 +10,8 @@ public final class Main {
     public static final Mode[] TRACE_MODES = new Mode[]{
         // Mode.DEBUG,
         // Mode.KEEP_ALIVE,
-        Mode.START,
-        Mode.SIP
+        //Mode.START,
+        //Mode.SIP
     };
 
     public static final int SO_TIMEOUT = 150;

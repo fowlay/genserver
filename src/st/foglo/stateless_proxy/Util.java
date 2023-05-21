@@ -251,21 +251,25 @@ public final class Util {
         return false;
     }
 
+    public static String mergeStrings(String a, String b) {
+        return mergeStrings("", a, b);
+    }
+
     /**
      * Merge two tag strings; the result is independent of argument order.
      * @param a
      * @param b
      * @return
      */
-    public static String mergeStrings(String a, String b) {
-
+    public static String mergeStrings(String u, String a, String b) {
         if (b.length() > a.length()) {
-            return mergeStrings(b, a);
+            return mergeStrings(u, b, a);
         } else {
             // a is longer than b, or equal length
             final char[] aa = a.toCharArray();
             final char[] bb = b.toCharArray();
-            final StringBuilder sb = new StringBuilder();
+            final StringBuilder sb = new StringBuilder(u);
+            sb.append('|');
             for (int j = 0; j < bb.length; j++) {
                 final int c = 33 + (((int) aa[j]) + ((int) bb[j])) % 94;
                 sb.append((char) c);

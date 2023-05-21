@@ -143,7 +143,7 @@ public final class PxCb extends CallBackBase {
                             sm.firstLineNoVersion());
 
                     // blacklisting
-                    if (sm.isBlacklisted() && side == Side.SP) {
+                    if (sm.isBlacklisted(fromUser) && side == Side.SP) {
                         Util.seq(Mode.SIP, Side.PX, Direction.NONE, "blacklisted: %s", fromUser);
                         return new CastResult(Atom.NOREPLY, TIMEOUT_NEVER);
                     }
@@ -294,8 +294,7 @@ public final class PxCb extends CallBackBase {
 
                     // finalize REGISTER actions
                     if (sm.getMethod() == Method.REGISTER) {
-                        final int code = sm.getCode();
-                        if (code >= 200 && code < 300) {
+                        if (sm.isSuccess()) {
                             final String branch = sm.getTopViaBranch();
                             final Boolean regAttempt = pendingRegistrations.get(branch);
                             pendingRegistrations.remove(branch);

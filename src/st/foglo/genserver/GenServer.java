@@ -12,9 +12,9 @@ import java.util.concurrent.ConcurrentMap;
 public final class GenServer implements Runnable {
 
     public static final TraceMode[] TRACE_MODES = new TraceMode[]{
-        TraceMode.DEBUG,
-        TraceMode.VERBOSE,
-        TraceMode.SILENT
+        // TraceMode.DEBUG,
+        // TraceMode.VERBOSE,
+        // TraceMode.SILENT
     };
 
     enum TraceMode {

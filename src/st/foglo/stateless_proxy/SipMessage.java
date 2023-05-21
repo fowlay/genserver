@@ -446,10 +446,22 @@ public class SipMessage implements Cloneable {
         return result;
     }
 
-    public boolean isBlacklisted() {
-        return
-            type == Type.REQUEST &&
-            getMethod() == Method.INVITE &&
-            SipMessage.isElement(getUser("From"), BlackList.blacklist());
+    public boolean isBlacklisted(String fromUser) {
+        return SipMessage.isElement(fromUser, BlackList.blacklist());
+    }
+
+    public boolean isSuccess() {
+        final int code = getCode();
+        return code >= 200 && code < 300;
+    }
+
+    public boolean isProvisional() {
+        final int code = getCode();
+        return code > 100 && code < 200;
+    }
+
+    public boolean isFinal() {
+        final int code = getCode();
+        return code >= 200 && code < 300;
     }
 }
