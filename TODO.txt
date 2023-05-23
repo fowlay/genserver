@@ -230,16 +230,40 @@ package-local trace functions.
 
 ------------------------------------------
 
-Presenter: Driven by events reported by the proxy:
+DONE: Present CANCEL processing, originating and terminating
+
+------------------------------------------
+
+DONE: Present "Busy here" processing, originating and terminating: Not
+possible to test the originating case, since a call will be set up to
+the Comviq answering machine.
+
+------------------------------------------
+
+Write a specification, in README.md?
+
+------------------------------------------
+
+DONE: Presenter: Driven by events reported by the proxy:
   registration
   de-registration
   notification from SP
   originating call
   terminating call
-  call length
   blocked call
 
-Introduce a new GenServer that cannot affect proxy processing.
+---------------------------------------------------
+
+Presenter: Display call length.
+
+-----------------------------------------
+
+Presenter: Finding the Dialog instance is not implemented in a neat
+way.
+
+-----------------------------------------
+
+Presenter: Revise the need for purging the hashmaps.
 
 -----------------------------------------
 

@@ -266,8 +266,7 @@ public class SipMessage implements Cloneable {
             throw new RuntimeException();
         }
         else if (type == Type.RESPONSE) {
-            final LinkedList<String> hh = getHeaderFields("CSeq");
-            final String[] words = hh.peek().split(" ");
+            final String[] words = getCseq();
             final String word = words[words.length - 1];
             for (Method m : Method.values()) {
                 if (m.toString().equals(word)) {
@@ -279,6 +278,20 @@ public class SipMessage implements Cloneable {
         else {
             throw new RuntimeException();
         }
+    }
+
+    public int getCseqNumber() {
+        return Integer.parseInt(getCseqNumberAsString());
+    }
+
+    public String getCseqNumberAsString() {
+        final String[] cseq = getCseq();
+        return cseq[0];
+    }
+
+    private String[] getCseq() {
+        final LinkedList<String> hh = getHeaderFields("CSeq");
+        return hh.peek().split(" ");
     }
 
     public int getCode() {
@@ -463,5 +476,10 @@ public class SipMessage implements Cloneable {
     public boolean isFinal() {
         final int code = getCode();
         return code >= 200 && code < 300;
+    }
+
+    public boolean isBusyHere() {
+        final int code = getCode();
+        return code == 486;
     }
 }
