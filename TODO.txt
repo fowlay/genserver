@@ -240,10 +240,6 @@ the Comviq answering machine.
 
 ------------------------------------------
 
-Write a specification, in README.md?
-
-------------------------------------------
-
 DONE: Presenter: Driven by events reported by the proxy:
   registration
   de-registration
@@ -252,14 +248,30 @@ DONE: Presenter: Driven by events reported by the proxy:
   terminating call
   blocked call
 
----------------------------------------------------
+-----------------------------------------
 
-Presenter: Display call length.
+DONE: Refactored finding of dialog instances.
 
 -----------------------------------------
 
-Presenter: Finding the Dialog instance is not implemented in a neat
-way.
+DONE: Dense numbering of presented calls.
+
+------------------------------------------
+
+Write a specification, in README.md?
+
+------------------------------------------
+
+Insert license blurb in some source files
+
+---------------------------------------------------
+
+Write a shell wrapper. No Makefile, just compile
+everything? Or use Maven?
+
+---------------------------------------------------
+
+Presenter: Display call length.
 
 -----------------------------------------
 

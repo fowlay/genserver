@@ -301,38 +301,41 @@ public class SipMessage implements Cloneable {
         return Integer.parseInt(parts[1]);
     }
 
-    // public String getFromTag() {
-    //     final LinkedList<String> fromTags = headers.get("From");
-    //     if (fromTags == null || fromTags.size() != 1) {
-    //         throw new RuntimeException();
-    //     }
-    //     else {
-    //         final String[] parts = fromTags.peek().split(";");
-    //         for (String part : parts) {
-    //             if (part.startsWith("tag=")) {
-    //                 return part.substring(4);
-    //             }
-    //         }
-    //         throw new RuntimeException();
-    //     }
-    // }
+    
 
     public String getTag(String key) {
-        final LinkedList<String> tags = headers.get(key);
-        if (tags == null || tags.size() != 1) {
+        final LinkedList<String> headerFields = headers.get(key);
+        if (headerFields == null || headerFields.size() != 1) {
             throw new RuntimeException();
         }
         else {
-            final String[] parts = tags.peek().split(";");
+            final String[] parts = headerFields.peek().split(";");
             for (String part : parts) {
                 if (part.startsWith("tag=")) {
                     return part.substring(4);
                 }
             }
-            throw new RuntimeException();
+            throw new RuntimeException(String.format("missing %s-tag", key));
         }
     }
 
+
+    
+    public String getTag(String key, String defaultValue) {
+        final LinkedList<String> headerFields = headers.get(key);
+        if (headerFields == null || headerFields.size() != 1) {
+            throw new RuntimeException();
+        }
+        else {
+            final String[] parts = headerFields.peek().split(";");
+            for (String part : parts) {
+                if (part.startsWith("tag=")) {
+                    return part.substring(4);
+                }
+            }
+            return defaultValue;
+        }
+    }
 
     /**
      * Returns true if this request has an Expires: 0 header,
@@ -481,5 +484,10 @@ public class SipMessage implements Cloneable {
     public boolean isBusyHere() {
         final int code = getCode();
         return code == 486;
+    }
+
+    public boolean isClientFailure() {
+        final int code = getCode();
+        return code >= 400 && code < 500;
     }
 }
