@@ -15,26 +15,39 @@ import st.foglo.stateless_proxy.SipMessage.Type;
 
 public class Presenter extends CallBackBase {
 
+    private static final long RECLAIM_REG = 3600;     // TODO: How long really?
+    private static final long RECLAIM_SIG = 900;      // longer than the longest call call
+    private static final long RECLAIM_BLOCKING = 35;  // Longer than the UDP resend period
+
     private enum MessageMode {
         DEBUG,
         INFO,
-        WARNING
+        WARNING,
+        RECLAIM
     }
 
     private static final MessageMode[] MESSAGE_MODES =
         new MessageMode[]{
             MessageMode.WARNING,
-            MessageMode.INFO
+            MessageMode.INFO,
+            MessageMode.RECLAIM
             //MessageMode.DEBUG
         };
 
     /**
      * REGISTER transactions; key is: From-tag of REGISTER request
      */
-    private Map<String, Boolean> regTrans = new HashMap<String, Boolean>();
+    private Map<String, RegTrans> regTrans = new HashMap<String, RegTrans>();
 
-    private Map<String, String> previousRegMessage = new HashMap<String, String>();
+    /**
+     * Maps registered user to latest message text; used for suppressing
+     * repeated messages. No memory leakage since very few keys occur.
+     */
+    private Map<String, MessageText> previousRegMessage = new HashMap<String, MessageText>();
 
+    /**
+     * Maps blocked from+to to timestamp
+     */
     private Map<String, Long> blockingMessage = new HashMap<String, Long>();
 
     /**
@@ -81,9 +94,11 @@ public class Presenter extends CallBackBase {
         DialogState state;
         boolean presented180 = false;
         String newKey = null;    // if assigned, this instance is a forward reference
+        long timestamp;
 
         public Dialog(DialogState state) {
             this.state = state;
+            timestamp = System.currentTimeMillis();
         }
 
         // public Dialog(DialogState state, String newKey) {
@@ -95,10 +110,28 @@ public class Presenter extends CallBackBase {
 
     class CallNumber {
         final int callNo;
-        final long whenCreated;
-        public CallNumber(int callNo, long whenCreated) {
+        final long timestamp;
+        public CallNumber(int callNo, long timestamp) {
             this.callNo = callNo;
-            this.whenCreated = whenCreated;
+            this.timestamp = timestamp;
+        }
+    }
+
+    class RegTrans {
+        final boolean registration;
+        final long timestamp;
+        public RegTrans(boolean registration, long timestamp) {
+            this.registration = registration;
+            this.timestamp = timestamp;
+        }
+    }
+
+    class MessageText {
+        final String text;
+        final long timestamp;
+        public MessageText(String text, long timestamp) {
+            this.text = text;
+            this.timestamp = timestamp;
         }
     }
 
@@ -119,11 +152,11 @@ public class Presenter extends CallBackBase {
 
         if (method == Method.REGISTER && type == Type.REQUEST) {
             debug("method == Method.REGISTER && type == Type.REQUEST");
-            return handleRegReq(sm);
+            return handleRegReq(callId, sm);
         }
         else if (method == Method.REGISTER && type == Type.RESPONSE && sm.isSuccess()) {
             debug("method == Method.REGISTER && type == Type.RESPONSE && sm.isSuccess()");
-            return handleRegResp(sm, toUser, fromUser);
+            return handleRegResp(callId, sm, toUser);
         }
         else if (method == Method.NOTIFY && type == Type.REQUEST && ism.side == Side.SP) {
             debug("method == Method.NOTIFY && type == Type.REQUEST && ism.side == Side.SP");
@@ -221,28 +254,25 @@ public class Presenter extends CallBackBase {
         }
     }
 
-    private CastResult handleRegReq(SipMessage sm) {
+    private CastResult handleRegReq(String callId, SipMessage sm) {
         regTrans.put(
-                sm.getTag("From"),
-                Boolean.valueOf(!sm.isDeRegister()));
+                Util.mergeStrings(callId, sm.getTag("From")),
+                new RegTrans(!sm.isDeRegister(), System.currentTimeMillis()));
         return new CastResult(Atom.NOREPLY, TIMEOUT_NEVER);
     }
 
-    private CastResult handleRegResp(SipMessage sm, String toUser, String fromUser) {
-        final String fromTag = sm.getTag("From");
-        final Boolean reg = regTrans.get(fromTag);
-        if (reg != null) {
-            regTrans.remove(fromTag);
+    private CastResult handleRegResp(String callId, SipMessage sm, String toUser) {
+        // handle a successful REGISTER response (registration or de-registration)
+        final String key = Util.mergeStrings(callId, sm.getTag("From"));
+        final RegTrans rt = regTrans.get(key);
+        final String text = String.format("%s %s", toUser, rt.registration ? "registered\n" : "de-registered\n");
+        // suppress repeated printouts
+        final MessageText previousMessageText = previousRegMessage.get(toUser);
+        if (!(previousMessageText != null && previousMessageText.text.equals(text))) {
+            present(text);
         }
-        final String text = String.format("%s %s", toUser, reg ? "registered\n" : "de-registered\n");
-            // suppress repeated printouts
-            final String previousMessage = previousRegMessage.get(toUser);
-            if (previousMessage != null && previousMessage.equals(text)) {
-                return new CastResult(Atom.NOREPLY, TIMEOUT_NEVER);
-            } else {
-                previousRegMessage.put(toUser, text);
-                present(text);
-            }
+        reclaimRegistration();
+        previousRegMessage.put(toUser, new MessageText(text, System.currentTimeMillis()));
         return new CastResult(Atom.NOREPLY, TIMEOUT_NEVER);
     }
 
@@ -270,17 +300,6 @@ public class Presenter extends CallBackBase {
 
     private CastResult handleTermInvReqBlacklisted(String callId, String fromUser, String toUser) {
 
-        // Clean the map from stale entries
-        // TODO, make this part of garbage collection
-        final LinkedList<String> keys = new LinkedList<String>();
-        for (Map.Entry<String, Long> me : blockingMessage.entrySet()) {
-            if (System.currentTimeMillis() - me.getValue().longValue() > 35000) {
-                keys.add(me.getKey());
-            }
-        }
-        for (String u : keys) {
-            blockingMessage.remove(u);
-        }
 
         final String key = Util.mergeStrings(fromUser, toUser);
         final Long millis = blockingMessage.get(key);
@@ -368,6 +387,7 @@ public class Presenter extends CallBackBase {
         }
         else {
             dialog.state = DialogState.ESTABLISHED;
+            dialog.timestamp = System.currentTimeMillis();  // update
             present(callId, "call established\n");
             return new CastResult(Atom.NOREPLY, TIMEOUT_NEVER);
         }
@@ -447,6 +467,7 @@ public class Presenter extends CallBackBase {
             return new CastResult(Atom.NOREPLY, TIMEOUT_NEVER);
         } else {
             dialog.state = DialogState.ESTABLISHED;
+            dialog.timestamp = System.currentTimeMillis();   // update
             present(callId, "outgoing call established\n");
             return new CastResult(Atom.NOREPLY, TIMEOUT_NEVER);
         }
@@ -468,12 +489,13 @@ public class Presenter extends CallBackBase {
         final Dialog dialog = findDialog(sm, callId);
         if (dialog == null) {
             present("no dialog found");
-            return new CastResult(Atom.NOREPLY, TIMEOUT_NEVER);
         }
         else {
-            present(callId, "call released by %s\n", sm.getUser("From"));
-            return new CastResult(Atom.NOREPLY, TIMEOUT_NEVER);
+            final int seconds = (int) ((System.currentTimeMillis() - dialog.timestamp)/1000);
+            present(callId, "call released by %s after %s\n", sm.getUser("From"), toHourMinSec(seconds));
         }
+        reclaimSignaling();
+        return new CastResult(Atom.NOREPLY, TIMEOUT_NEVER);
     }
 
     private CastResult handleTermByeRespReverse(SipMessage sm, String callId) {
@@ -565,6 +587,13 @@ public class Presenter extends CallBackBase {
         }
     }
 
+    private void reclaimMessage(String text) {
+        if (member(MessageMode.RECLAIM, MESSAGE_MODES)) {
+            System.out.println(String.format("<<< %s", text));
+        }
+    }
+
+
     private Dialog findDialog(SipMessage sm, String callId, String fromTag, String toTag) {
         if (toTag == null) {
             return findDialog(sm, callId, fromTag);
@@ -600,5 +629,112 @@ public class Presenter extends CallBackBase {
             }
         }
         return false;
+    }
+
+    
+    private String toHourMinSec(int seconds) {
+        final StringBuilder sb = new StringBuilder();
+        final int h = seconds/3600;
+        final int m = (seconds % 3600)/60;
+        final int s = seconds % 60;
+        if (h > 0) {
+            sb.append(h);
+            sb.append("h ");
+        }
+        if (m > 0 || h > 0) {
+            sb.append(m);
+            sb.append("m ");
+        }
+        sb.append(s);
+        sb.append("s");
+        return sb.toString();
+    }
+
+    private void reclaimSignaling() {
+
+        final long now = System.currentTimeMillis();
+
+        final LinkedList<String> keys = new LinkedList<String>();
+
+        for (Map.Entry<String, Long> me : blockingMessage.entrySet()) {
+            if (now - me.getValue().longValue() > 1000*RECLAIM_BLOCKING) {
+                keys.add(me.getKey());
+            }
+        }
+        for (String u : keys) {
+            reclaimMessage("reclaim blocking");
+            blockingMessage.remove(u);
+        }
+
+
+        keys.clear();
+        for (Map.Entry<String, Dialog> me : dialogs.entrySet()) {
+            if (now - me.getValue().timestamp > 1000*RECLAIM_SIG) {
+                keys.add(me.getKey());
+            }
+        }
+        for (String u : keys) {
+            reclaimMessage("reclaim dialogs");
+            dialogs.remove(u);
+        }
+
+        keys.clear();
+        for (Map.Entry<String, Dialog> me : expectedAcks.entrySet()) {
+            if (now - me.getValue().timestamp > 1000*RECLAIM_SIG) {
+                keys.add(me.getKey());
+            }
+        }
+        for (String u : keys) {
+            reclaimMessage("reclaim expected ACKs");
+            expectedAcks.remove(u);
+        }
+    
+        keys.clear();
+        for (Map.Entry<String, Long> me : ignoredCalls.entrySet()) {
+            if (now - me.getValue().longValue() > 1000*RECLAIM_SIG) {
+                keys.add(me.getKey());
+            }
+        }
+        for (String u : keys) {
+            reclaimMessage("reclaim ignoredCalls");
+            ignoredCalls.remove(u);
+        }
+
+        keys.clear();
+        for (Map.Entry<String, CallNumber> me : callNumbers.entrySet()) {
+            if (now - me.getValue().timestamp > 1000*RECLAIM_SIG) {
+                keys.add(me.getKey());
+            }
+        }
+        for (String u : keys) {
+            reclaimMessage("reclaim call numbers");
+            callNumbers.remove(u);
+        }
+    }
+
+    private void reclaimRegistration() {
+
+        final long now = System.currentTimeMillis();
+
+        final LinkedList<String> keys = new LinkedList<String>();
+
+        for (Map.Entry<String, RegTrans> e : regTrans.entrySet()) {
+            if (now - e.getValue().timestamp > 1000*RECLAIM_REG) {
+                keys.add(e.getKey());
+            }
+        }
+        for (String key : keys) {
+            regTrans.remove(key);
+        }
+
+        keys.clear();
+        for (Map.Entry<String, MessageText> e : previousRegMessage.entrySet()) {
+            if (now - e.getValue().timestamp > 1000*RECLAIM_REG) {
+                keys.add(e.getKey());
+            }
+        }
+        for (String key : keys) {
+            previousRegMessage.remove(key);
+        }
     }
 }

@@ -256,6 +256,23 @@ DONE: Refactored finding of dialog instances.
 
 DONE: Dense numbering of presented calls.
 
+---------------------------------------------------
+
+DONE: Presenter: Display call length.
+
+-----------------------------------------
+
+DONE: Presenter: Garbage collection of Presenter maps, based on
+timestamps
+
+------------------------------------------
+
+Consider using log4J
+
+------------------------------------------
+
+Consider using Maven build
+
 ------------------------------------------
 
 Write a specification, in README.md?
@@ -268,14 +285,6 @@ Insert license blurb in some source files
 
 Write a shell wrapper. No Makefile, just compile
 everything? Or use Maven?
-
----------------------------------------------------
-
-Presenter: Display call length.
-
------------------------------------------
-
-Presenter: Revise the need for purging the hashmaps.
 
 -----------------------------------------
 

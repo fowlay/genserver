@@ -27,6 +27,8 @@ public final class PxCb extends CallBackBase {
     /**
      * Map of incoming branch parameter to True/False, for registrations/de-registrations
      * to be performed on successful response
+     * 
+     * TODO: This map is potentially a memory leak?
      */
     private Map<String, Boolean> pendingRegistrations = new HashMap<String, Boolean>();
 
