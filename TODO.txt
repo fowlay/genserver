@@ -265,26 +265,32 @@ DONE: Presenter: Display call length.
 DONE: Presenter: Garbage collection of Presenter maps, based on
 timestamps
 
+---------------------------------
+
+DONE: Blacklisting: Introduce a whitelist too - a whitelist match will
+bypass the blacklist check.
+
 ------------------------------------------
 
 Consider using log4J
-
-------------------------------------------
-
-Consider using Maven build
-
-------------------------------------------
-
-Write a specification, in README.md?
-
-------------------------------------------
-
-Insert license blurb in some source files
 
 ---------------------------------------------------
 
 Write a shell wrapper. No Makefile, just compile
 everything? Or use Maven?
+
+------------------------------------------
+
+Consider using Maven build after all, take pattern from gerke-decoder
+
+------------------------------------------
+
+Write a specification, in README.md? How should parameters be entered?
+What kind of logging should be produced?
+
+------------------------------------------
+
+Insert license blurb in some source files
 
 -----------------------------------------
 
@@ -331,7 +337,8 @@ Blacklisting: Blacklisted patterns from file outside folder
 
 --------------------------------------
 
-Merge to master (main?) branch, accepting VSCode for development
+Merge to master (main?) branch, accepting VSCode for
+development. Clean out Eclipse settings?
 
 --------------------------------------
 

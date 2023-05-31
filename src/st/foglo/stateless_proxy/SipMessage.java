@@ -9,7 +9,9 @@ import java.util.Map.Entry;
 public class SipMessage implements Cloneable {
     
     final Type type;
-    
+
+    boolean isBlacklisted = false;
+
     /**
      * A string; no CR LF at the end
      */
@@ -372,7 +374,7 @@ public class SipMessage implements Cloneable {
         return "BRANCH_PARAMETER_NOT_FOUND";
     }
  
-    public static boolean isElement(String x, String[] a) {
+    public boolean isElement(String x, String[] a) {
         for (String u : a) {
             if (u.equals(x)) {
                 return true;
@@ -380,9 +382,6 @@ public class SipMessage implements Cloneable {
         }
         return false;
     }
-
-
-
 
     public void prepend(String key, String headerFieldValue) {
         LinkedList<String> headerFields = getHeaderFields(key);
@@ -462,10 +461,6 @@ public class SipMessage implements Cloneable {
         return result;
     }
 
-    public boolean isBlacklisted(String fromUser) {
-        return SipMessage.isElement(fromUser, BlackList.blacklist());
-    }
-
     public boolean isSuccess() {
         final int code = getCode();
         return code >= 200 && code < 300;
@@ -489,5 +484,9 @@ public class SipMessage implements Cloneable {
     public boolean isClientFailure() {
         final int code = getCode();
         return code >= 400 && code < 500;
+    }
+
+    public boolean isBlacklisted() {
+        return isBlacklisted;
     }
 }

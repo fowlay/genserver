@@ -162,8 +162,8 @@ public class Presenter extends CallBackBase {
             debug("method == Method.NOTIFY && type == Type.REQUEST && ism.side == Side.SP");
             return handleTermNotifyReq(sm);
         }
-        else if (method == Method.INVITE && type == Type.REQUEST && ism.side == Side.SP && sm.isBlacklisted(fromUser)) {
-            debug("method == Method.INVITE && type == Type.REQUEST && ism.side == Side.SP && sm.isBlacklisted(fromUser)");
+        else if (method == Method.INVITE && type == Type.REQUEST && ism.side == Side.SP && sm.isBlacklisted) {
+            debug("method == Method.INVITE && type == Type.REQUEST && ism.side == Side.SP && sm.isBlacklisted");
             return handleTermInvReqBlacklisted(callId, fromUser, toUser);
         }
 
@@ -299,12 +299,10 @@ public class Presenter extends CallBackBase {
     }
 
     private CastResult handleTermInvReqBlacklisted(String callId, String fromUser, String toUser) {
-
-
         final String key = Util.mergeStrings(fromUser, toUser);
         final Long millis = blockingMessage.get(key);
         if (millis == null) {
-            present(String.format("[%d] blocking incoming call from %s to %s", callId, fromUser, toUser));
+            present(callId, "blocking incoming call from %s to %s", fromUser, toUser);
             blockingMessage.put(key, Long.valueOf(System.currentTimeMillis()));
         }
         return new CastResult(Atom.NOREPLY, TIMEOUT_NEVER);

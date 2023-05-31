@@ -38,9 +38,22 @@ public final class PxCb extends CallBackBase {
 
     final GenServer presenter;
 
-    final BlackList blackList;
+    final Blacklist blacklist;
+    final Whitelist whitelist;
 
+    public PxCb(byte[] sipAddrUe, Integer sipPortUe,
+            byte[] sipAddrSp, Integer sipPortSp,
+            GenServer presenter) {
 
+        listenerAddresses.put(Side.UE, sipAddrUe);
+        listenerPorts.put(Side.UE, sipPortUe);
+        listenerAddresses.put(Side.SP, sipAddrSp);
+        listenerPorts.put(Side.SP, sipPortSp);
+
+        this.presenter = presenter;
+        this.blacklist = new Blacklist();
+        this.whitelist = new Whitelist();
+    }
 
     private GenServer getPortsender(Side side) {
         for (; true; ) {
@@ -63,21 +76,6 @@ public final class PxCb extends CallBackBase {
                 }
             }
         }
-    }
-
-
-    public PxCb(byte[] sipAddrUe, Integer sipPortUe,
-                byte[] sipAddrSp, Integer sipPortSp,
-                GenServer presenter,
-                BlackList blackList) {
-
-        listenerAddresses.put(Side.UE, sipAddrUe);
-        listenerPorts.put(Side.UE, sipPortUe);
-        listenerAddresses.put(Side.SP, sipAddrSp);
-        listenerPorts.put(Side.SP, sipPortSp);
-
-        this.presenter = presenter;
-        this.blackList = blackList;
     }
 
     ///////////////////////////////////////////
@@ -139,13 +137,18 @@ public final class PxCb extends CallBackBase {
 
                 if (type == Type.REQUEST) {
 
+                    // blacklisting
+                    if (side == Side.SP && isBlacklisted(fromUser)) {
+                        sm.isBlacklisted = true;
+                    }
+
                     presenter.cast((InternalSipMessage)ism.clone());
 
                     Util.seq(Mode.SIP, Side.PX, direction(side, otherSide),
                             sm.firstLineNoVersion());
 
                     // blacklisting
-                    if (sm.isBlacklisted(fromUser) && side == Side.SP) {
+                    if (sm.isBlacklisted == true) {
                         Util.seq(Mode.SIP, Side.PX, Direction.NONE, "blacklisted: %s", fromUser);
                         return new CastResult(Atom.NOREPLY, TIMEOUT_NEVER);
                     }
@@ -392,4 +395,21 @@ public final class PxCb extends CallBackBase {
         return result;
     }
 
+    public boolean isBlacklisted(String fromUser) {
+        if (isPrefix(whitelist.whitelist(), fromUser)) {
+            return false;
+        }
+        else {
+            return isPrefix(blacklist.blacklist(), fromUser);
+        }
+    }
+
+    public boolean isPrefix(String[] bb, String u) {
+        for (String b : bb) {
+            if (u.startsWith(b)) {
+                return true;
+            }
+        }
+        return false;
+    }
 }
