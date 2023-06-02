@@ -1,5 +1,13 @@
 package st.foglo.stateless_proxy;
 
+import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.util.Properties;
+
 import st.foglo.genserver.GenServer;
 import st.foglo.stateless_proxy.Util.Mode;
 
@@ -14,31 +22,78 @@ public final class Main {
         // Mode.SIP
     };
 
-    public static final int SO_TIMEOUT = 150;
-    public static final int KEEPALIVE_MSG_MAX_SIZE = 4;
-    public static final int DATAGRAM_MAX_SIZE = 3000;
+    public static final java.util.Properties DEFAULTS = new java.util.Properties();
+
+    static {
+        DEFAULTS.setProperty("so-timeout", "150");
+        DEFAULTS.setProperty("keepalive-msg-max-size", "4");
+        DEFAULTS.setProperty("datagram-max-size", "3000");
+
+        DEFAULTS.setProperty("sip-port-ue", "9060");
+        DEFAULTS.setProperty("sip-port-sp", "9070");
+
+        DEFAULTS.setProperty("outgoing-proxy-addr-sp", "193.105.226.106");
+        DEFAULTS.setProperty("outgoing-proxy-port-sp", "5060");
+    }
+
+    public static final Properties PROPERTIES = new Properties(DEFAULTS);
+
+    static {
+        try {
+            PROPERTIES.load(getReader());
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.exit(-1);
+        }
+    }
+
+    public static final int SO_TIMEOUT = getIntProperty("so-timeout");
+    public static final int KEEPALIVE_MSG_MAX_SIZE = getIntProperty("keepalive-msg-max-size");
+    public static final int DATAGRAM_MAX_SIZE = getIntProperty("datagram-max-size");
+
     public static final boolean NEVER = System.currentTimeMillis() == 314;
     public static final boolean ALWAYS = !NEVER;
     public static final boolean RECORD_ROUTE = ALWAYS;
-    public static final boolean NIO = ALWAYS;
 
-    //public static final int[] localIpAddress = new int[]{10, 0, 0, 17};
-    public static final int[] localIpAddress = new int[]{10, 10, 69, 179};
-    //public static final int[] localIpAddress = new int[]{192, 168, 43, 84};
+    public static final int[] localIpAddress = getDottedIpAsInts("local-ip-address");
 
     // where we listen for UEs
     public static final byte[] sipAddrUe = Util.toByteArray(localIpAddress);
-    public static final Integer sipPortUe = Integer.valueOf(9060);
+    public static final Integer sipPortUe = Integer.valueOf(getIntProperty("sip-port-ue"));
 
     // where we send to and listen for the SP
     public static final byte[] sipAddrSp = Util.toByteArray(localIpAddress);
-    public static final Integer sipPortSp = Integer.valueOf(9070);
+    public static final Integer sipPortSp = Integer.valueOf(getIntProperty("sip-port-sp"));
 
-    // outgoing proxy
-    public static final byte[] outgoingProxyAddrSp =
-            Util.toByteArray(new int[]{193, 105, 226, 106});
+    public static final byte[] outgoingProxyAddrSp = Util.toByteArray(getDottedIpAsInts("outgoing-proxy-addr-sp"));
     public static final Integer outgoingProxyPortSp = Integer.valueOf(5060);
 
+    ////////////////////////////////////////////////////
+
+    /**
+     * Gets a reader for .stateless-proxy/config.properties in home directory.
+     */
+    private static Reader getReader() {
+        final String home = System.getProperty("user.home");
+        final String separator = System.getProperty("file.separator");
+        try {
+            return new BufferedReader(
+                new InputStreamReader(
+                    new FileInputStream(home+separator+".stateless-proxy"+separator+"config.properties")));
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+            System.exit(-1);
+            return null;
+        }
+    }
+
+    private static int getIntProperty(String key) {
+        return Integer.parseInt(PROPERTIES.getProperty(key));
+    }
+
+    private static int[] getDottedIpAsInts(String dottedIp) {
+        return Util.dottedIpToInts(PROPERTIES.getProperty(dottedIp));
+    }
 
     /////////////////////////////////
 

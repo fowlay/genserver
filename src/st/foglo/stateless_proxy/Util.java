@@ -13,7 +13,7 @@ public final class Util {
         IGNORE,
         GENSERVER             // provisional
     }
-    
+
     public enum Direction {
         IN,
         OUT,
@@ -21,7 +21,7 @@ public final class Util {
         UE,
         SP
     }
-    
+
     private static final String[] white = new String[]{
             "",
             "               ",
@@ -30,7 +30,7 @@ public final class Util {
             "                                                            ",
             "                                                                           "
     };
-    
+
 
     // TODO, move elsewhere?
     public static byte[] toByteArray(int[] kk) {
@@ -41,9 +41,9 @@ public final class Util {
         }
         return result;
     }
-    
+
     public enum Level {silent, verbose, debug};
-    
+
     public static void trace(Level level, String s) {
         display(level, String.format("%s", s));
     }
@@ -51,35 +51,35 @@ public final class Util {
     public static void trace(Level level, String format, int j) {
         display(level, String.format(format, j));
     }
-    
+
     public static void trace(Level level, String format, String s) {
         display(level, String.format(format, s));
     }
-    
+
     public static void trace(Level level, String format, boolean s) {
         display(level, String.format(format, s));
     }
-    
+
     public static void trace(Level level, String format, String s, int j) {
         display(level, String.format(format, s, j));
     }
-    
+
     public static void trace(Level level, String format, String s, int j, String t) {
         display(level, String.format(format, s, j, t));
     }
-    
+
     public static void trace(Level level, String format, String s, int j, int k) {
         display(level, String.format(format, s, j, k));
     }
-    
+
     public static void trace(Level level, String format, String s, String t) {
         display(level, String.format(format, s, t));
     }
-    
+
     public static void trace(Level level, String format, String s, String t, int j) {
         display(level, String.format(format, s, t, j));
     }
-    
+
     private static void display(Level level, String line) {
         if (Main.traceLevel.ordinal() >= level.ordinal()) {
             final String threadName = Thread.currentThread().getName();
@@ -87,7 +87,7 @@ public final class Util {
             String.format("%s %-15s %s%n", ldt(), threadName, line));
         }
     }
-    
+
 
 
     public static void seq(Mode mode, Side where, Direction towards,
@@ -106,14 +106,14 @@ public final class Util {
     }
 
     public static void seq(Mode mode, Side where, Direction towards, String text) {
-        
+
         if (!isMember(mode, Main.TRACE_MODES)) {
             return;
         }
-        
+
         final String arrowLeft = "<--";
         final String arrowRight = "-->";
-        
+
         final String arrow;
         if (towards == Direction.NONE) {
             arrow = "";
@@ -123,7 +123,7 @@ public final class Util {
         }
         else if (towards == Direction.IN && where == Side.SP) {
             arrow = arrowLeft;
-            
+
         }
         else if (towards == Direction.OUT && where == Side.UE) {
             arrow = arrowLeft;
@@ -140,14 +140,14 @@ public final class Util {
         else {
             throw new RuntimeException();
         }
-        
+
         String whiteSpace =
             where == Side.UE ? white[1] :
                 where == Side.PX ? white[3] :
                     where == Side.SP ? white[5] :
                         where == Side.GS ? white[0] :
                             "internal error";
-        
+
 
         final Level[] levels = Level.values();
         display(levels[0], String.format("%s%s %s", whiteSpace, arrow, text));
@@ -162,12 +162,12 @@ public final class Util {
      * @param text
      */
     public static void seq(Level level, Side where, Direction towards, String text) {
-        
+
         //System.out.println(String.format("%s|%s|%s|%s", level, where, towards, text));
-        
+
         final String arrowLeft = "<--";
         final String arrowRight = "-->";
-        
+
         final String arrow;
         if (towards == Direction.NONE) {
             arrow = "";
@@ -177,7 +177,7 @@ public final class Util {
         }
         else if (towards == Direction.IN && where == Side.SP) {
             arrow = arrowLeft;
-            
+
         }
         else if (towards == Direction.OUT && where == Side.UE) {
             arrow = arrowLeft;
@@ -193,15 +193,15 @@ public final class Util {
         }
         else {
             throw new RuntimeException();
-            
+
         }
-        
+
         String whiteSpace =
                 where == Side.UE ? white[0] :
                     where == Side.PX ? white[2] :
                         where == Side.SP ? white[4] :
-                            "internal error"; 
-        
+                            "internal error";
+
         display(level, String.format("%s%s %s", whiteSpace, arrow, text));
     }
 
@@ -216,7 +216,7 @@ public final class Util {
             return String.format("%s %s", date, time);
         }
     }
-    
+
 
 
     public static String bytesToString(byte[] buffer, int recLength) {
@@ -239,6 +239,25 @@ public final class Util {
             }
         }
         return sb.toString();
+    }
+
+    public static byte[] dottedIpToBytes(String dottedIp) {
+        final String[] parts = dottedIp.split(".");
+        byte[] result = new byte[parts.length];
+        for (int j = 0; j < parts.length; j++) {
+            final int m = Integer.parseInt(parts[j]);
+            result[j] = (byte) (m >= 128 ? m - 256 : m);
+        }
+        return result;
+    }
+
+    public static int[] dottedIpToInts(String dottedIp) {
+        final String[] parts = dottedIp.split("[.]");
+        int[] result = new int[parts.length];
+        for (int j = 0; j < parts.length; j++) {
+            result[j] = Integer.parseInt(parts[j]);
+        }
+        return result;
     }
 
     private static boolean isMember(Mode m, Mode[] mm) {

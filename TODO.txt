@@ -272,6 +272,14 @@ bypass the blacklist check.
 
 ------------------------------------------
 
+DONE: Using Java properties for configuration.
+
+------------------------------------------
+
+Introduce aliases for known telephone numbers
+
+------------------------------------------
+
 Consider using log4J
 
 ---------------------------------------------------
@@ -286,7 +294,8 @@ Consider using Maven build after all, take pattern from gerke-decoder
 ------------------------------------------
 
 Write a specification, in README.md? How should parameters be entered?
-What kind of logging should be produced?
+What kind of logging should be produced? Where are timestamps to be
+included?
 
 ------------------------------------------
 
